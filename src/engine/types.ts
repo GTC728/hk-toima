@@ -1,0 +1,255 @@
+/** 座位：0=東家起，逆時針 0→1→2→3 */
+export type Seat = 0 | 1 | 2 | 3
+
+export type Suit = 'man' | 'pin' | 'sou' | 'wind' | 'dragon' | 'flower'
+
+export type WindKind = 'east' | 'south' | 'west' | 'north'
+export type DragonKind = 'zhong' | 'fa' | 'bai'
+export type FlowerKind =
+  | 'spring'
+  | 'summer'
+  | 'autumn'
+  | 'winter'
+  | 'plum'
+  | 'orchid'
+  | 'chrysanthemum'
+  | 'bamboo'
+
+/** Canonical tile id, e.g. man-3, wind-east, flower-spring */
+export type TileId = string
+
+export type MeldKind = 'chi' | 'pong' | 'mingkong' | 'ankong' | 'jiagang'
+
+export interface Meld {
+  kind: MeldKind
+  tiles: TileId[]
+  /** 誰打出／被鳴 */
+  fromSeat?: Seat
+  claimedTile?: TileId
+}
+
+export interface DingState {
+  /** 天叮／地叮／普通叮 */
+  kind: 'normal' | 'tian' | 'di'
+  /** 叮後打橫記認嘅第一張 */
+  markerDiscard?: TileId
+  /** 叮後是否仍在可即食嘅一巡內 */
+  ippatsuActive: boolean
+  /** 叮後過水則整局不可再食 */
+  guoshuiLocked: boolean
+}
+
+export interface PlayerState {
+  hand: TileId[]
+  melds: Meld[]
+  flowers: TileId[]
+  discards: TileId[]
+  ding: DingState | null
+  /** 本巡見過可碰而未碰嘅牌（過碰） */
+  passedPong: TileId[]
+  /** 本巡過水食糊 */
+  passedWinThisLap: boolean
+}
+
+export type Phase =
+  | 'playing'
+  | 'claim_window'
+  | 'round_over'
+  | 'wall_exhausted'
+  | 'match_over'
+
+export type ClaimKind = 'win' | 'kong' | 'pong' | 'chi' | 'pass'
+
+export interface Claim {
+  seat: Seat
+  kind: ClaimKind
+  /** 上：手上兩張 */
+  chiTiles?: TileId[]
+}
+
+export interface PendingDiscard {
+  seat: Seat
+  tile: TileId
+  /** 尚未回應嘅座位 */
+  awaiting: Seat[]
+  claims: Claim[]
+}
+
+export interface TableRules {
+  /** 底 */
+  base: number
+  /** 番值 */
+  fanValue: number
+  /** 幾口可斬拉 */
+  maxLaKou: number
+  /** 五同順番數（常見 40） */
+  fiveTongShunFan: number
+  /** 計五同順後唔再計般高／相逢 */
+  excludeBanGaoXiangFengAfterWuTong: boolean
+  /** 出牌限時（秒） */
+  turnTimeoutSec: number
+  /** 鳴牌窗限時（秒） */
+  claimTimeoutSec: number
+  /** 打幾圈（1＝只東圈；4＝東南西北） */
+  matchCircles: number
+}
+
+export const DEFAULT_RULES: TableRules = {
+  base: 10,
+  fanValue: 2,
+  maxLaKou: 3,
+  fiveTongShunFan: 40,
+  excludeBanGaoXiangFengAfterWuTong: true,
+  turnTimeoutSec: 20,
+  claimTimeoutSec: 12,
+  matchCircles: 4,
+}
+
+export interface WinResult {
+  seat: Seat
+  /** 自摸／出銃／搶槓 */
+  winType: 'tsumo' | 'ron' | 'chankan'
+  discarder?: Seat
+  fans: { id: string; name: string; value: number }[]
+  totalFan: number
+  /** 未計莊番前嘅牌型番 */
+  handFan: number
+  /** 每家應付（自摸）或出銃者應付 */
+  paymentPerPayer: number
+  payments: { from: Seat; to: Seat; amount: number }[]
+}
+
+export interface RoundResult {
+  kind: 'win' | 'draw'
+  wins: WinResult[]
+  /** 下一局莊家 */
+  nextDealer: Seat
+  /** 下一局連莊數 */
+  nextConsecutiveWins: number
+}
+
+/** 拉數欠款：debtor 欠 creditor */
+export interface LaEntry {
+  creditor: Seat
+  debtor: Seat
+  amount: number
+  /** 已拉口數（再食一次 +1） */
+  kou: number
+}
+
+export interface GameConfig {
+  rules?: Partial<TableRules>
+  /** 可重現洗牌 */
+  seed?: number
+  dealerSeat?: Seat
+  consecutiveDealerWins?: number
+  playerNames?: string[]
+}
+
+export interface GameState {
+  rules: TableRules
+  seed: number
+  wall: TileId[]
+  /** 牆頭下一張索引 */
+  liveIndex: number
+  /** 槓尾指針：由牆尾向前補（下一張係 deadWallIndex-1） */
+  deadWallIndex: number
+  dice: [number, number, number]
+  /** 開門座位（相對莊） */
+  openSeat: Seat
+  dealer: Seat
+  /** 連莊次數 N（連 0 = 未連） */
+  consecutiveWins: number
+  players: [PlayerState, PlayerState, PlayerState, PlayerState]
+  currentSeat: Seat
+  phase: Phase
+  /** 剛摸到、尚未打出 */
+  justDrawn: TileId | null
+  /** 上／碰後唔摸牌，必須打一張 */
+  mustDiscard: boolean
+  pendingDiscard: PendingDiscard | null
+  /** 加槓搶槓窗口 */
+  chankan: boolean
+  /** 上一次動作是否開槓／鳴牌（打斷即食） */
+  lastInterruptIppatsu: boolean
+  /** 本局已收過一台花／一台草（每局各一次） */
+  claimedYitaihua: boolean
+  claimedYitaicao: boolean
+  /** 本局已打出幾張（天地人胡） */
+  discardsThisRound: number
+  round: number
+  windRound: number
+  laLedger: LaEntry[]
+  lastResult: RoundResult | null
+  /** 即時賞罰紀錄（唔入拉） */
+  instantPayouts: { from: Seat; to: Seat; amount: number; reason: string }[]
+  history: string[]
+  actionLog: ActionLogEntry[]
+}
+
+export type Action =
+  | { type: 'start' }
+  | { type: 'discard'; tile: TileId; declareDing?: boolean }
+  | { type: 'draw' }
+  | { type: 'chi'; tiles: TileId[] }
+  | { type: 'pong' }
+  | { type: 'mingkong' }
+  | { type: 'ankong'; tile: TileId }
+  | { type: 'jiagang'; tile: TileId }
+  | { type: 'win' }
+  | { type: 'pass' }
+  | { type: 'declareDing' }
+  | { type: 'chopLa'; creditor: Seat; debtor: Seat }
+  | { type: 'settleAll' }
+  | { type: 'nextRound'; seed?: number }
+
+/** 結構化動作紀錄（覆盤用）；保留 history 字串 */
+export interface ActionLogEntry {
+  t: number
+  seat: Seat | null
+  action: Action
+  note?: string
+}
+
+export interface PublicPlayerView {
+  seat: Seat
+  name: string
+  handCount: number
+  melds: Meld[]
+  flowers: TileId[]
+  discards: TileId[]
+  ding: DingState | null
+  isDealer: boolean
+}
+
+export interface PublicGameView {
+  rules: TableRules
+  dice: [number, number, number]
+  dealer: Seat
+  consecutiveWins: number
+  currentSeat: Seat
+  phase: Phase
+  wallRemaining: number
+  players: PublicPlayerView[]
+  pendingDiscard: PendingDiscard | null
+  justDrawnVisible: boolean
+  /** 上／碰後只打牌（未摸） */
+  mustDiscard: boolean
+  laLedger: LaEntry[]
+  lastResult: RoundResult | null
+  instantPayouts: GameState['instantPayouts']
+  round: number
+  windRound: number
+  /** 覆盤／音效用 */
+  seed: number
+  actionLog: ActionLogEntry[]
+  /** 終局攤牌（round_over / match_over） */
+  revealedHands?: TileId[][]
+}
+
+export interface PrivateGameView extends PublicGameView {
+  you: Seat
+  hand: TileId[]
+  justDrawn: TileId | null
+  legalActions: Action[]
+}
