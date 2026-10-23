@@ -226,7 +226,7 @@ export function LaBook({ onBack }: LaBookProps) {
                   ? `+${Math.round(nets[s]! / Math.max(1, DEFAULT_RULES.fanValue))}番`
                   : nets[s]! < 0
                     ? `−${Math.round(Math.abs(nets[s]!) / Math.max(1, DEFAULT_RULES.fanValue))}番`
-                    : '0番'
+                    : '0番'}
               </em>
             </label>
           ))}

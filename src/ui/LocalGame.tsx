@@ -382,11 +382,6 @@ export function LocalGame({ config, onLeave }: LocalGameProps) {
         hintDiscardTile={hintTile}
         remainSec={waitingAi ? null : remainSec}
       />
-      {waitingAi && (
-        <p className="table__ai-banner" role="status">
-          AI（{WIND[actor]} · {names[actor]}）諗緊…
-        </p>
-      )}
       {error && <p className="table__error">{error}</p>}
       <button type="button" className="table__leave-link" onClick={onLeave}>
         返大廳

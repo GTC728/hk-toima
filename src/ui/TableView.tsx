@@ -47,12 +47,10 @@ function SeatMeta({
   seat,
   p,
   isHuman,
-  isTurn,
 }: {
   seat: Seat
   p: PublicPlayerView
   isHuman: boolean
-  isTurn: boolean
 }) {
   return (
     <div className="table__seat-meta">
@@ -63,7 +61,6 @@ function SeatMeta({
         {p.isDealer && <em>莊</em>}
         {p.ding && <em className="tag-ding">叮</em>}
         {!isHuman && <em className="tag-ai">AI</em>}
-        {isTurn && <em className="tag-turn">行動中</em>}
         <em className="tag-cash">${p.cash}</em>
       </span>
     </div>
@@ -194,7 +191,7 @@ function SideSeat({
         isTurn ? ' is-turn' : ''
       }`}
     >
-      <SeatMeta seat={seat} p={p} isHuman={isHuman} isTurn={isTurn} />
+      <SeatMeta seat={seat} p={p} isHuman={isHuman} />
       <div className="table__side-fit">
         <div
           className={`table__side-stack${
@@ -323,7 +320,6 @@ export function TableView({
             seat={top}
             p={pTop}
             isHuman={isHuman[top]!}
-            isTurn={isTurn(top)}
           />
           <div className="table__orient table__orient--top">
             <FaceDownHand count={pTop.handCount} size="sm" />
@@ -427,7 +423,6 @@ export function TableView({
             seat={bottom}
             p={pBottom}
             isHuman={isHuman[bottom]!}
-            isTurn={isTurn(bottom)}
           />
           <MeldsBlock
             p={pBottom}

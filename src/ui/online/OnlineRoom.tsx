@@ -204,12 +204,6 @@ export function OnlineRoom({
 
   // —— In-game table ——
   if (started && view) {
-    const waitingOthers =
-      view.phase === 'playing' && view.currentSeat !== view.you
-    const waitingClaim =
-      view.phase === 'claim_window' &&
-      !(view.pendingDiscard?.awaiting.includes(view.you) ?? false)
-
     return (
       <div className="table-wrap">
         <InstantToast payouts={view.instantPayouts} names={names} />
@@ -223,13 +217,6 @@ export function OnlineRoom({
           onAction={dispatchAction}
           remainSec={remainSec}
         />
-        {(waitingOthers || waitingClaim) && (
-          <p className="table__ai-banner" role="status">
-            {waitingClaim
-              ? '等人家決定鳴牌…'
-              : `${WIND[view.currentSeat]}家行動中…`}
-          </p>
-        )}
         {(error || lastError) && (
           <p className="table__error">{error || lastError}</p>
         )}

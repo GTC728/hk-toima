@@ -99,6 +99,14 @@ function formatMoney(n: number): string {
   return '$0'
 }
 
+/** 未結清（拉帳／本鋪）用番，唔寫 $ */
+function formatFanDelta(amount: number, fanValue: number): string {
+  const fan = Math.round(amount / Math.max(1, fanValue))
+  if (fan > 0) return `+${fan}番`
+  if (fan < 0) return `−${Math.abs(fan)}番`
+  return '0番'
+}
+
 function buildPlayers(
   view: SettlementModel,
   names: string[],
@@ -388,11 +396,27 @@ export function Settlement({
             const isYou = youSeat === p.seat
             const winNet = winNetForSeat(result, p.seat)
             const instNet = instantNetForSeat(instantOnly, p.seat)
-            // 拉帳制：本鋪入拉；現金＝即時結清＋本鋪拉帳實際增減（含再食×1.5）
+            // 拉帳制：本鋪入拉（未結清＝番）；即時結清先入金池（$）
             const laNet = showLaInline
               ? laDeltaForSeat(view.laLedger, p.seat)
               : 0
-            const cashNet = showLaInline ? instNet + laNet : winNet + instNet
+            const fv = view.rules.fanValue
+            const roundNetLabel = showLaInline
+              ? [
+                  laNet !== 0 ? formatFanDelta(laNet, fv) : null,
+                  instNet !== 0 ? formatMoney(instNet) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || '0番'
+              : formatMoney(winNet + instNet)
+            const roundNetSign = showLaInline
+              ? laNet !== 0
+                ? laNet
+                : instNet
+              : winNet + instNet
+            const handPayLabel = showLaInline
+              ? formatFanDelta(winNet, fv)
+              : formatMoney(winNet)
             const las = showLaInline
               ? laLinesForSeat(
                   view.laLedger,
@@ -426,15 +450,15 @@ export function Settlement({
                   <div className="settlement__seat-nets">
                     <div
                       className={`settlement__seat-net${
-                        cashNet > 0
+                        roundNetSign > 0
                           ? ' is-plus'
-                          : cashNet < 0
+                          : roundNetSign < 0
                             ? ' is-minus'
                             : ''
                       }`}
                     >
                       <span className="settlement__net-label">本局</span>
-                      {formatMoney(cashNet)}
+                      {roundNetLabel}
                     </div>
                     <div className="settlement__seat-net settlement__seat-net--pool">
                       <span className="settlement__net-label">金池</span>
@@ -459,7 +483,7 @@ export function Settlement({
                     >
                       <span>
                         {win.totalFan}番 · {winTypeLabel(win, names)} · 本鋪{' '}
-                        {formatMoney(winNet)}
+                        {handPayLabel}
                         {instNet !== 0
                           ? ` · 即時 ${formatMoney(instNet)}`
                           : ''}
@@ -470,7 +494,7 @@ export function Settlement({
                     </button>
                   ) : result?.kind === 'win' ? (
                     <span className="settlement__seat-sub">
-                      本鋪 {formatMoney(winNet)}
+                      本鋪 {handPayLabel}
                       {instNet !== 0 ? ` · 即時 ${formatMoney(instNet)}` : ''}
                     </span>
                   ) : (
