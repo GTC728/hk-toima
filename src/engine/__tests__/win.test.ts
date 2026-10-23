@@ -4,6 +4,7 @@ import {
   findStandardWins,
   isLiguligu,
   isReady,
+  isSixteenBuDa,
   isThirteenOrphans,
   waitingTiles,
 } from '../win-check'
@@ -98,5 +99,61 @@ describe('win-check', () => {
     expect(isReady(ready, [])).toBe(true)
     const waits = waitingTiles(ready, [])
     expect(waits).toContain('pin-6')
+  })
+
+  describe('十六不搭', () => {
+    it('accepts 147/258/369 + honor eye', () => {
+      // 萬147 筒258 索369 + 東西南北中發 + 南眼（叫糊爭一南）
+      const hand: TileId[] = [
+        'man-1', 'man-4', 'man-7',
+        'pin-2', 'pin-5', 'pin-8',
+        'sou-3', 'sou-6', 'sou-9',
+        'wind-east', 'wind-west', 'wind-north',
+        'dragon-zhong', 'dragon-fa', 'dragon-bai',
+        'wind-south',
+      ]
+      expect(hand).toHaveLength(16)
+      expect(isSixteenBuDa(hand, 'wind-south')).toBe(true)
+      expect(canWin(hand, [], 'wind-south')).toBe(true)
+    })
+
+    it('rejects screenshot hand: 萬 1·3·4·7 有相鄰／可上', () => {
+      const hand: TileId[] = [
+        'man-1', 'man-4', 'man-7',
+        'pin-1', 'pin-4', 'pin-8',
+        'sou-5', 'sou-9',
+        'wind-east',
+        'wind-south', 'wind-south',
+        'wind-west', 'wind-north',
+        'dragon-zhong', 'dragon-fa', 'dragon-bai',
+      ]
+      expect(hand).toHaveLength(16)
+      expect(isSixteenBuDa(hand, 'man-3')).toBe(false)
+      expect(canWin(hand, [], 'man-3')).toBe(false)
+    })
+
+    it('rejects adjacent ranks in same suit (差1)', () => {
+      const hand: TileId[] = [
+        'man-1', 'man-4', 'man-5',
+        'pin-2', 'pin-5', 'pin-8',
+        'sou-3', 'sou-6', 'sou-9',
+        'wind-east', 'wind-west', 'wind-north',
+        'dragon-zhong', 'dragon-fa', 'dragon-bai',
+        'wind-south',
+      ]
+      expect(isSixteenBuDa(hand, 'wind-south')).toBe(false)
+    })
+
+    it('rejects gap-2 ranks that can chi (差2)', () => {
+      const hand: TileId[] = [
+        'man-1', 'man-3', 'man-7',
+        'pin-2', 'pin-5', 'pin-8',
+        'sou-3', 'sou-6', 'sou-9',
+        'wind-east', 'wind-west', 'wind-north',
+        'dragon-zhong', 'dragon-fa', 'dragon-bai',
+        'wind-south',
+      ]
+      expect(isSixteenBuDa(hand, 'wind-south')).toBe(false)
+    })
   })
 })

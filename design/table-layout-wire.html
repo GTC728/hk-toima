@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>HK ToiMa · 枱面佈局設計稿 v2</title>
+  <style>
+    :root {
+      --felt: #1a5c40;
+      --felt-deep: #0f3d2a;
+      --cream: #f3ead8;
+      --gold: #c4a35a;
+      --wood: #6b4423;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Serif TC", "Songti TC", serif;
+      background: #12100c;
+      color: var(--cream);
+      padding: 1.25rem;
+    }
+    h1 { margin: 0 0 0.35rem; font-size: 1.35rem; letter-spacing: 0.12em; }
+    .sub { margin: 0 0 1rem; opacity: 0.65; font-size: 0.9rem; }
+    .notes {
+      max-width: 56rem;
+      margin: 0 auto 1.1rem;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      opacity: 0.9;
+    }
+    .notes strong { color: var(--gold); }
+    .notes ol { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+    .notes li { margin-bottom: 0.35rem; }
+
+    /* ─── 枱：外圈座位 + 中間口字河 ─── */
+    .stage {
+      --hud: 9.5rem; /* 中控邊長；上下／左右牌河唔超出呢個寬／高 */
+      max-width: 56rem;
+      margin: 0 auto;
+      aspect-ratio: 15 / 12;
+      display: grid;
+      grid-template-columns: minmax(4.5rem, 1fr) var(--hud) minmax(4.5rem, 1fr);
+      grid-template-rows: auto auto minmax(var(--hud), 1fr) auto auto;
+      gap: 0.4rem 0.45rem;
+      padding: 0.7rem;
+      border: 3px solid var(--wood);
+      border-radius: 6px;
+      background:
+        radial-gradient(ellipse 70% 60% at 50% 45%, #2a7a54, var(--felt) 50%, var(--felt-deep));
+    }
+
+    .label {
+      font-style: normal;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      color: var(--gold);
+      background: rgba(0,0,0,0.4);
+      padding: 0.08rem 0.3rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+    .box {
+      border: 1px dashed rgba(243, 234, 216, 0.35);
+      border-radius: 3px;
+      background: rgba(0,0,0,0.12);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 0.35rem;
+      min-height: 2rem;
+    }
+    .box .label {
+      position: absolute;
+      top: 0.15rem;
+      left: 0.25rem;
+      z-index: 2;
+    }
+    .melds {
+      background: rgba(212,175,55,0.14);
+      border-color: rgba(212,175,55,0.45);
+    }
+    .river {
+      background: rgba(0,0,0,0.28);
+      border: 1px solid rgba(243,234,216,0.2);
+      width: var(--hud);
+      justify-self: center;
+    }
+    .river.side {
+      width: auto;
+      height: 100%;
+      max-height: var(--hud);
+      align-self: center;
+      writing-mode: horizontal-tb;
+    }
+
+    .tile {
+      width: 0.72rem;
+      height: 0.95rem;
+      flex-shrink: 0;
+      background: linear-gradient(160deg, #fffef8, #ebe3d4);
+      border: 1px solid #cfc4b0;
+      border-radius: 1px;
+    }
+    .tile.back {
+      background: linear-gradient(145deg, #2a6b52, #1a4a38);
+      border-color: #0f3d2e;
+    }
+
+    /* 轉向：面向出牌／持牌本人（由螢幕視角） */
+    .rot-0 { transform: rotate(0deg); }       /* 自己 */
+    .rot-180 { transform: rotate(180deg); }   /* 對家 */
+    .rot-90 { transform: rotate(90deg); }     /* 右＝下家（順時針視角） */
+    .rot-270 { transform: rotate(-90deg); }   /* 左＝上家 */
+
+    .tile-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      justify-content: center;
+      align-content: center;
+      margin-top: 0.85rem;
+    }
+    .tile-col {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      gap: 2px;
+      max-height: calc(var(--hud) - 0.5rem);
+      margin-top: 0.85rem;
+      align-content: center;
+    }
+
+    /* grid placements */
+    .top-hand { grid-column: 2; grid-row: 1; }
+    .top-meld { grid-column: 2; grid-row: 2; }
+    .left-hand { grid-column: 1; grid-row: 3; align-self: center; }
+    .left-meld { grid-column: 1; grid-row: 3; justify-self: end; margin-right: 0; transform: translateX(0); }
+    /* left stack: hand outer, meld toward center — use nested */
+    .left-stack {
+      grid-column: 1;
+      grid-row: 3;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.35rem;
+      align-self: center;
+    }
+    .right-stack {
+      grid-column: 3;
+      grid-row: 3;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.35rem;
+      align-self: center;
+    }
+    .river-top { grid-column: 2; grid-row: 3; align-self: start; width: var(--hud); height: auto; min-height: 2.4rem; }
+    .hud {
+      grid-column: 2;
+      grid-row: 3;
+      width: var(--hud);
+      height: var(--hud);
+      justify-self: center;
+      align-self: center;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background: #1a1a1c;
+      border: 1px solid rgba(196,163,90,0.45);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      line-height: 1.4;
+      z-index: 1;
+      padding: 0.4rem;
+    }
+    .hud strong { color: var(--gold); display: block; margin-bottom: 0.15rem; }
+    .river-bottom { grid-column: 2; grid-row: 3; align-self: end; width: var(--hud); min-height: 2.4rem; }
+    .bot-meld { grid-column: 2; grid-row: 4; width: min(100%, 20rem); justify-self: center; }
+    .bot-hand { grid-column: 1 / -1; grid-row: 5; }
+
+    /* 口字河：用子 grid 包住中控+四河，寬高鎖定中控 */
+    .mouth {
+      grid-column: 2;
+      grid-row: 3;
+      display: grid;
+      grid-template-columns: auto var(--hud) auto;
+      grid-template-rows: auto var(--hud) auto;
+      justify-self: center;
+      align-self: center;
+      gap: 0.3rem;
+    }
+    .mouth .hud { grid-column: 2; grid-row: 2; width: var(--hud); height: var(--hud); }
+    .mouth .rt { grid-column: 2; grid-row: 1; width: var(--hud); }
+    .mouth .rb { grid-column: 2; grid-row: 3; width: var(--hud); }
+    .mouth .rl { grid-column: 1; grid-row: 2; height: var(--hud); width: 2.6rem; }
+    .mouth .rr { grid-column: 3; grid-row: 2; height: var(--hud); width: 2.6rem; }
+
+    .deg {
+      position: absolute;
+      right: 0.25rem;
+      bottom: 0.15rem;
+      font-size: 0.58rem;
+      opacity: 0.55;
+    }
+
+    .legend {
+      max-width: 56rem;
+      margin: 1.2rem auto 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+    .legend div {
+      padding: 0.55rem 0.65rem;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      border-left: 3px solid var(--gold);
+    }
+  </style>
+</head>
+<body>
+  <h1>HK ToiMa · 枱面佈局設計稿 v2</h1>
+  <p class="sub">修正：左右明牌層級 · 四邊轉向持有者 · 上下牌河寬＝中控邊長</p>
+
+  <div class="notes">
+    <p><strong>由外到內（四家同一邏輯）</strong></p>
+    <ol>
+      <li><strong>手牌／手背</strong>（最貼邊）</li>
+      <li><strong>明牌／副露</strong>（夾喺手牌同牌河之間；左右同樣）</li>
+      <li><strong>牌河</strong>（貼中控四邊，形成口字）</li>
+      <li><strong>中控</strong></li>
+    </ol>
+    <p><strong>轉向（螢幕視角）：</strong>牌面永遠「面向出牌／持牌嗰家」——自己 0°、對家 180°、左家（上家）−90°、右家（下家）+90°。明牌同牌河同一旋轉規則。</p>
+    <p><strong>寬度：</strong>對家／自己嘅牌河<strong>寬度＝中控邊長</strong>，唔超出中控；左右牌河<strong>高度＝中控邊長</strong>，同左右明牌帶分開，唔拉闊成成個側欄。</p>
+  </div>
+
+  <div class="stage" aria-label="枱面線框 v2">
+    <!-- 對家：手背 → 明牌 →（再入 mouth 頂河） -->
+    <div class="box top-hand rot-180">
+      <span class="label">對家 · 手背</span>
+      <span class="deg">180°</span>
+      <div class="tile-row">
+        <span class="tile back"></span><span class="tile back"></span><span class="tile back"></span>
+        <span class="tile back"></span><span class="tile back"></span><span class="tile back"></span>
+        <span class="tile back"></span><span class="tile back"></span>
+      </div>
+    </div>
+    <div class="box melds top-meld rot-180">
+      <span class="label">對家 · 明牌</span>
+      <span class="deg">180°</span>
+      <div class="tile-row">
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+      </div>
+    </div>
+
+    <!-- 左：手背（外）→ 明牌（內，貼河） -->
+    <div class="left-stack">
+      <div class="box rot-270" style="min-height:7rem">
+        <span class="label">左 · 手背</span>
+        <span class="deg">−90°</span>
+        <div class="tile-col">
+          <span class="tile back"></span><span class="tile back"></span><span class="tile back"></span>
+          <span class="tile back"></span><span class="tile back"></span>
+        </div>
+      </div>
+      <div class="box melds rot-270" style="min-height:5rem;width:2.8rem">
+        <span class="label">明牌</span>
+        <span class="deg">−90°</span>
+        <div class="tile-col">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 口字：四河 + 中控；上下河寬＝中控 -->
+    <div class="mouth">
+      <div class="box river rt rot-180">
+        <span class="label">對家 · 牌河</span>
+        <span class="deg">180° · 寬＝中控</span>
+        <div class="tile-row">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+      <div class="box river rl rot-270">
+        <span class="label">左河</span>
+        <span class="deg">−90°</span>
+        <div class="tile-col">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+      <div class="hud">
+        <div>
+          <strong>中控</strong>
+          東圈 · 東局<br />牆 · 底5番<br />莊／計時<br />
+          <span style="opacity:0.5;font-size:0.62rem">邊長鎖定牌河寬高</span>
+        </div>
+      </div>
+      <div class="box river rr rot-90">
+        <span class="label">右河</span>
+        <span class="deg">+90°</span>
+        <div class="tile-col">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+      <div class="box river rb rot-0">
+        <span class="label">我 · 牌河</span>
+        <span class="deg">0° · 寬＝中控</span>
+        <div class="tile-row">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：明牌（內）→ 手背（外） -->
+    <div class="right-stack">
+      <div class="box melds rot-90" style="min-height:5rem;width:2.8rem">
+        <span class="label">明牌</span>
+        <span class="deg">+90°</span>
+        <div class="tile-col">
+          <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        </div>
+      </div>
+      <div class="box rot-90" style="min-height:7rem">
+        <span class="label">右 · 手背</span>
+        <span class="deg">+90°</span>
+        <div class="tile-col">
+          <span class="tile back"></span><span class="tile back"></span><span class="tile back"></span>
+          <span class="tile back"></span><span class="tile back"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="box melds bot-meld rot-0">
+      <span class="label">我 · 明牌（手牌↔牌河之間）</span>
+      <span class="deg">0°</span>
+      <div class="tile-row" style="justify-content:flex-start">
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        &nbsp;
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+      </div>
+    </div>
+    <div class="box bot-hand rot-0">
+      <span class="label">我 · 手牌（最底）</span>
+      <span class="deg">0°</span>
+      <div class="tile-row" style="justify-content:flex-start;margin-top:1rem">
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+        <span class="tile"></span><span class="tile"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div><strong>層級</strong><br />手 → 明牌 → 河 → 中控（左右一樣）</div>
+    <div><strong>轉向</strong><br />自己 0° · 對家 180° · 左 −90° · 右 +90°</div>
+    <div><strong>牌河尺寸</strong><br />上下寬＝中控；左右高＝中控</div>
+    <div><strong>已實作</strong><br />TableView 口字 grid + 左右外殼旋轉</div>
+  </div>
+</body>
+</html>

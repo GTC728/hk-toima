@@ -10,6 +10,7 @@ import {
   getPublicView,
   hintDiscard,
   remainingSec,
+  timeoutPlayAction,
   type Action,
   type GameState,
   type Seat,
@@ -186,7 +187,7 @@ export function LocalGame({ config, onLeave }: LocalGameProps) {
     turnContextKey(state, actor),
   ])
 
-  // Tick countdown; on expiry auto AI / pass
+  // Tick countdown; on expiry: 打牌用提示／最新摸；鳴牌自動 pass
   useEffect(() => {
     if (deadlineAt == null) {
       setRemainSec(null)
@@ -202,11 +203,16 @@ export function LocalGame({ config, onLeave }: LocalGameProps) {
       if (seat == null || !isHumanSeat(humanSeats, seat)) return
       if (privacySeat != null || revealedSeat !== seat) return
       try {
-        const action =
-          chooseAiAction(s0, seat) ??
-          (getLegalActions(s0, seat).some((a) => a.type === 'pass')
-            ? ({ type: 'pass' } as Action)
-            : null)
+        let action: Action | null = null
+        if (s0.phase === 'claim_window') {
+          action = getLegalActions(s0, seat).some((a) => a.type === 'pass')
+            ? { type: 'pass' }
+            : null
+        } else {
+          action = timeoutPlayAction(s0, seat, {
+            preferAiDiscard: practiceHints,
+          })
+        }
         if (!action) return
         setError(null)
         setState(applyWithClaims(s0, action, seat))
@@ -219,7 +225,7 @@ export function LocalGame({ config, onLeave }: LocalGameProps) {
     tick()
     const id = window.setInterval(tick, 200)
     return () => window.clearInterval(id)
-  }, [deadlineAt, humanSeats, privacySeat, revealedSeat])
+  }, [deadlineAt, humanSeats, privacySeat, revealedSeat, practiceHints])
 
   // AI turns + auto-pass claims（上／碰後要打牌，唔好自動摸）
   useEffect(() => {

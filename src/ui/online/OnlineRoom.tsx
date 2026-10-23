@@ -312,7 +312,7 @@ export function OnlineRoom({
 
         {!isHost && room && (
           <p className="online-lobby__rules">
-            枱規：底 ${room.rules.base} · 一番 ${room.rules.fanValue} · 拉
+            枱規：底 {room.rules.base}番 · ${room.rules.fanValue}/番 · 拉
             {room.rules.maxLaKou}口 · 五同順 {room.rules.fiveTongShunFan}番 ·
             出牌 {room.rules.turnTimeoutSec}s · 鳴牌{' '}
             {room.rules.claimTimeoutSec}s · {room.rules.matchCircles}圈

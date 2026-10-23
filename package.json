@@ -12,7 +12,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "worker:dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "react": "^19.3.1",

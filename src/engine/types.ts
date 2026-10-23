@@ -39,6 +39,9 @@ export interface DingState {
   guoshuiLocked: boolean
 }
 
+/** 開局／AI 預設金池（跨局繼承） */
+export const DEFAULT_STARTING_CASH = 2000
+
 export interface PlayerState {
   hand: TileId[]
   melds: Meld[]
@@ -49,6 +52,8 @@ export interface PlayerState {
   passedPong: TileId[]
   /** 本巡過水食糊 */
   passedWinThisLap: boolean
+  /** 現金池（即時賞罰／斷拉／踢半／斬拉／埋單入帳；拉帳未結唔扣） */
+  cash: number
 }
 
 export type Phase =
@@ -76,9 +81,12 @@ export interface PendingDiscard {
 }
 
 export interface TableRules {
-  /** 底 */
+  /**
+   * 底（番數）。食糊時計入總番，銀碼＝總番×番值，唔再另外加一筆底銀。
+   * 即時「一個底」＝ base × fanValue。
+   */
   base: number
-  /** 番值 */
+  /** 一番幾多銀 */
   fanValue: number
   /** 幾口可斬拉 */
   maxLaKou: number
@@ -94,8 +102,12 @@ export interface TableRules {
   matchCircles: number
 }
 
+/**
+ * 預設枱規＝坊間眾數番表（見 fans.json／design/fan-survey.md）。
+ * 底 5 番；一番 $2 → 一個底等值 $10；五同順 40、計後唔再計般高／相逢。
+ */
 export const DEFAULT_RULES: TableRules = {
-  base: 10,
+  base: 5,
   fanValue: 2,
   maxLaKou: 3,
   fiveTongShunFan: 40,
@@ -109,6 +121,8 @@ export interface WinResult {
   seat: Seat
   /** 自摸／出銃／搶槓 */
   winType: 'tsumo' | 'ron' | 'chankan'
+  /** 糊牌（出銃時唔喺贏家手牌內） */
+  winTile: TileId
   discarder?: Seat
   fans: { id: string; name: string; value: number }[]
   totalFan: number
@@ -135,6 +149,10 @@ export interface LaEntry {
   amount: number
   /** 已拉口數（再食一次 +1） */
   kou: number
+  /** 本鋪計入拉帳嘅銀碼（結算顯示用；未喺本鋪郁過則無） */
+  lastHandAmount?: number
+  /** 再食前舊帳（結算顯示：本局 + 上局×1.5 = 新） */
+  prevAmount?: number
 }
 
 export interface GameConfig {
@@ -175,8 +193,19 @@ export interface GameState {
   /** 本局已收過一台花／一台草（每局各一次） */
   claimedYitaihua: boolean
   claimedYitaicao: boolean
-  /** 本局已打出幾張（天地人胡） */
+  /** 七搶一／八仙等已結算（避免重複） */
+  claimedFlowerSpecial: boolean
+  /** 本局已打出幾張（天地人胡／子內） */
   discardsThisRound: number
+  /** 當前座位連續補花次數（花摸） */
+  flowerDrawChain: number
+  /** 當前座位連續槓補次數（槓摸） */
+  kongDrawChain: number
+  /** 上一手補牌來源 */
+  lastSupplement: 'flower' | 'kong' | null
+  /** 追：連續打出同一隻嘅座位（清空於換牌） */
+  chaseTile: TileId | null
+  chaseSeats: Seat[]
   round: number
   windRound: number
   laLedger: LaEntry[]
@@ -220,6 +249,7 @@ export interface PublicPlayerView {
   discards: TileId[]
   ding: DingState | null
   isDealer: boolean
+  cash: number
 }
 
 export interface PublicGameView {

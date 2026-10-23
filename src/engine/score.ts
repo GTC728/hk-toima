@@ -26,23 +26,38 @@ export interface BuildWinInput {
   multiRonCount?: number
   discarderIsDealer?: boolean
   zhengHuaTiles?: TileId[]
+  flowerDrawChain?: number
+  kongDrawChain?: number
+  visibleWinTileCount?: number
+  fanxue?: boolean
+  /** 圈風：0東 1南 2西 3北 */
+  windRound?: number
 }
 
-/** 金額 = 底 + 番 × 番值 */
+/** 銀碼＝總番 × 番值（底已計入總番，唔另加） */
 export function amountFromFan(rules: TableRules, fan: number): number {
-  return rules.base + fan * rules.fanValue
+  return fan * rules.fanValue
 }
 
-/** 莊番：做莊 1 + 連 N 莊 2N */
+/** 即時「一個底」銀碼＝底番 × 番值 */
+export function diAmount(rules: TableRules): number {
+  return Math.max(0, rules.base) * rules.fanValue
+}
+
+/** 莊番：做莊 1；連 N 莊共 2N+1（含莊，永遠奇數） */
 export function dealerExtraFan(consecutiveWins: number): number {
   return 1 + 2 * consecutiveWins
 }
 
+function baseFanHit(rules: TableRules): FanHit {
+  return { id: 'di', name: '底', value: Math.max(0, rules.base) }
+}
+
 /**
- * 牌型番（唔包莊／連莊）。莊番按付款方另計。
+ * 牌型番（含底；唔包莊／連莊）。莊番按付款方另計。
  */
 export function handFansWithoutDealer(input: BuildWinInput): FanHit[] {
-  return calculateFans({
+  const pattern = calculateFans({
     hand: input.hand,
     melds: input.melds,
     flowers: input.flowers,
@@ -60,7 +75,13 @@ export function handFansWithoutDealer(input: BuildWinInput): FanHit[] {
     fiveTongShunFan: input.rules.fiveTongShunFan,
     excludeBanGaoXiangFengAfterWuTong:
       input.rules.excludeBanGaoXiangFengAfterWuTong,
+    flowerDrawChain: input.flowerDrawChain ?? 0,
+    kongDrawChain: input.kongDrawChain ?? 0,
+    visibleWinTileCount: input.visibleWinTileCount ?? 0,
+    fanxue: input.fanxue ?? false,
+    windRound: input.windRound ?? 0,
   })
+  return [baseFanHit(input.rules), ...pattern]
 }
 
 export function buildWinResult(input: BuildWinInput): WinResult {
@@ -74,45 +95,40 @@ export function buildWinResult(input: BuildWinInput): WinResult {
   const fans: FanHit[] = [...handFans]
 
   if (input.winType === 'tsumo') {
-    // 三家各付：閒家付 底+牌型番；莊家（若非贏家）另加莊番
+    // 自摸：三家同一額。莊家自摸先一齊加莊／連莊；閒家自摸唔再另收莊多付。
+    const payFan = winnerIsDealer ? handFan + dExtra : handFan
+    const amount = amountFromFan(input.rules, payFan)
+    paymentPerPayer = amount
     for (let s = 0; s < 4; s++) {
       const from = s as Seat
       if (from === input.seat) continue
-      let fan = handFan
-      if (winnerIsDealer) {
-        // 莊家自摸：三家都要付牌型+莊番
-        fan = handFan + dExtra
-      } else if (from === input.dealer) {
-        // 閒家自摸：莊家多付莊番
-        fan = handFan + dExtra
-      }
-      const amount = amountFromFan(input.rules, fan)
       payments.push({ from, to: input.seat, amount })
-      paymentPerPayer = amountFromFan(input.rules, handFan + (winnerIsDealer ? dExtra : 0))
     }
     if (winnerIsDealer) {
-      fans.push({ id: 'dealer', name: '莊', value: 1 })
+      // Ting：做莊+1；連 N＝2N+1（含莊），唔拆成莊1+連莊雙數
       if (input.consecutiveWins > 0) {
         fans.push({
           id: 'lianzhuang',
           name: '連莊',
-          value: 2 * input.consecutiveWins,
+          value: dExtra,
         })
+      } else {
+        fans.push({ id: 'dealer', name: '莊', value: 1 })
       }
     }
   } else {
-    // 出銃／搶槓：一人付
     const from = input.discarder!
     let fan = handFan
     if (winnerIsDealer) {
       fan += dExtra
-      fans.push({ id: 'dealer', name: '莊', value: 1 })
       if (input.consecutiveWins > 0) {
         fans.push({
           id: 'lianzhuang',
           name: '連莊',
-          value: 2 * input.consecutiveWins,
+          value: dExtra,
         })
+      } else {
+        fans.push({ id: 'dealer', name: '莊', value: 1 })
       }
     } else if (from === input.dealer) {
       fan += dExtra
@@ -127,6 +143,7 @@ export function buildWinResult(input: BuildWinInput): WinResult {
   return {
     seat: input.seat,
     winType: input.winType,
+    winTile: input.winTile,
     discarder: input.discarder,
     fans,
     totalFan: totalFanValue,
@@ -136,10 +153,10 @@ export function buildWinResult(input: BuildWinInput): WinResult {
   }
 }
 
-/** 計劃例子：$5 底 $1 番，平胡+無字+自摸 = 8 番，每家 $13 */
+/** 底5 + 平胡5 + 無字2 + 自摸1 = 13 番 × $1 = $13 */
 export function examplePinghuWuziZimo(
   rules: TableRules = { ...DEFAULT_RULES, base: 5, fanValue: 1 },
 ): number {
-  const fan = 5 + 2 + 1
+  const fan = rules.base + 5 + 2 + 1
   return amountFromFan(rules, fan)
 }

@@ -5,6 +5,13 @@ compatibility_date = "2025-10-01"
 # Worker + Vite both import `src/engine` (shared authoritative game logic).
 # No duplicate package — relative imports from worker/ → ../src/engine.
 
+# 前端 Vite build（dist）同 API／WebSocket 一齊部署；手機開 *.workers.dev 即可玩
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+# 只有 /api/* 先入 Worker；其餘靜態檔／SPA
+run_worker_first = ["/api/*"]
+
 [durable_objects]
 bindings = [
   { name = "ROOM", class_name = "RoomDurableObject" }

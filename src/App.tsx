@@ -7,6 +7,7 @@ import { FanCalculator } from './ui/FanCalculator'
 import { OnlineRoom } from './ui/online/OnlineRoom'
 import { Tutorial } from './ui/Tutorial'
 import { StatsPage } from './ui/StatsPage'
+import { LaBook } from './ui/LaBook'
 import {
   DEFAULT_RULES_DRAFT,
   type RulesDraft,
@@ -16,7 +17,7 @@ import './App.css'
 
 const PRACTICE_LOCAL: LobbyStartConfig = {
   humanSeats: [true, false, false, false],
-  names: ['你', 'AI·南', 'AI·西', 'AI·北'],
+  names: ['玩家-1', 'AI-1', 'AI-2', 'AI-3'],
   rules: { ...DEFAULT_RULES_DRAFT },
   practiceHints: true,
 }
@@ -32,6 +33,7 @@ type Screen =
     }
   | { kind: 'fans' }
   | { kind: 'calculator' }
+  | { kind: 'labook' }
   | { kind: 'tutorial' }
   | { kind: 'stats' }
 
@@ -66,6 +68,10 @@ export default function App() {
     return <FanCalculator onBack={() => setScreen({ kind: 'lobby' })} />
   }
 
+  if (screen.kind === 'labook') {
+    return <LaBook onBack={() => setScreen({ kind: 'lobby' })} />
+  }
+
   if (screen.kind === 'tutorial') {
     return (
       <Tutorial
@@ -89,6 +95,7 @@ export default function App() {
       }
       onOpenFans={() => setScreen({ kind: 'fans' })}
       onOpenCalculator={() => setScreen({ kind: 'calculator' })}
+      onOpenLaBook={() => setScreen({ kind: 'labook' })}
       onOpenTutorial={() => setScreen({ kind: 'tutorial' })}
       onOpenStats={() => setScreen({ kind: 'stats' })}
     />

@@ -31,6 +31,28 @@ npm run worker:dev # Cloudflare Worker + Room DO（http://127.0.0.1:8787）
 
 只開 Vite 而無 worker 時，開房／入房會失敗。
 
+## 上線（手機可玩）
+
+建議：**GitHub 存碼 + Cloudflare Workers 部署**（本專案已有房間 Durable Object，同一條 `*.workers.dev` 同時提供 UI 同聯機）。
+
+```bash
+# 1）登入 Cloudflare（本機互動一次）
+npx wrangler login
+
+# 2）build 前端 + 部署 Worker／靜態資源／房間 DO
+npm run deploy
+```
+
+成功後終端會印出例如 `https://hk-toima.<你的帳號>.workers.dev` —— 手機瀏覽器開呢個網址即可（本機對打／開房聯機都得）。
+
+| 做法 | 適合 | 備註 |
+| --- | --- | --- |
+| `npm run deploy` → Workers | 正式／朋友聯機 | 免費額度通常夠玩；要自訂域名可喺 CF Dashboard 綁 |
+| 本機 `npm run dev -- --host` + 同一 Wi‑Fi | 自己試手機 UI | 聯機仍要另開 `worker:dev`；唔經公網 |
+| Cloudflare Tunnel／ngrok 轉發本機 | 臨時分享 | 唔使正式 deploy，但電腦要開住 |
+
+GitHub 只係存碼／CI；真正畀手機開嘅係 Workers 網址，唔係 `github.com` 頁面。
+
 ## 引擎 API
 
 ```ts
@@ -72,11 +94,14 @@ const me = getPrivateView(next, seat)
 ## 目錄
 
 ```
-src/engine/     # 共用引擎 + fans.json + tests
+src/engine/     # 共用引擎 + fans.json（常見枱表預設）+ tests
 src/ui/         # 大廳、本機枱、網上房、番表、結算
 src/ui/online/  # HTTP／WS／seatToken
 worker/         # Room Durable Object + HTTP API
+design/         # 番表互斥、參考來源（fan-refs.md）
 ```
+
+預設番數＝多來源眾數（Ting 坊間系，唔跟麻雀數簿偏高檔）：見 `design/fan-survey.md`。
 
 ## 已補齊（相對初版）
 

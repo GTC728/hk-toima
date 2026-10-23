@@ -45,6 +45,8 @@ export function ActionBar({
   const anKongs = legal.filter((a) => a.type === 'ankong')
   const jiaGangs = legal.filter((a) => a.type === 'jiagang')
   const mingKong = legal.find((a) => a.type === 'mingkong')
+  const canClaimMeld =
+    canWin || canPong || Boolean(mingKong) || chiOptions.length > 0
 
   return (
     <div className="action-bar">
@@ -53,8 +55,11 @@ export function ActionBar({
           等：{waitingTiles.map(tileLabel).join(' · ')}
         </p>
       )}
-      {pendingTile && (
+      {pendingTile && canClaimMeld && (
         <p className="action-bar__pending">有人打出 · 可鳴／食</p>
+      )}
+      {pendingTile && !canClaimMeld && canPass && (
+        <p className="action-bar__pending">有人打出 · 已被更高優先鳴牌</p>
       )}
       {mustDiscard && discardLegal.length > 0 && (
         <p className="action-bar__pending">上／碰後請打牌</p>

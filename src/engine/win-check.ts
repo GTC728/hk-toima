@@ -129,8 +129,8 @@ export function isThirteenOrphans(hand: TileId[], winTile: TileId): boolean {
 }
 
 /**
- * 十六不搭（簡化）：門清、17 張、恰好一對眼、其餘全單張，
- * 且任何三張都砌唔成順／刻（成手前）。
+ * 十六不搭：門清、17 張、恰好一對眼、其餘全單張，
+ * 同門數牌兩兩之間至少差 3（唔可相鄰／隔一上，常見 147／258／369）。
  */
 export function isSixteenBuDa(hand: TileId[], winTile: TileId): boolean {
   const tiles = [...hand, winTile]
@@ -141,16 +141,16 @@ export function isSixteenBuDa(hand: TileId[], winTile: TileId): boolean {
   if (vals.filter((n) => n === 2).length !== 1) return false
   if (vals.some((n) => n > 2)) return false
   if (vals.filter((n) => n === 1).length !== 15) return false
-  // 唔可以有三連順潛力：同一花色有連續三個單張
+  // 同門：排序後相鄰兩 rank 必須 ≥3（禁 3+4 相鄰、1+3 可上）
   for (const suit of ['man', 'pin', 'sou'] as const) {
-    const ranks = new Set<number>()
+    const ranks: number[] = []
     for (const [id, n] of counts) {
       if (!id.startsWith(suit + '-') || n < 1) continue
-      const r = Number(id.split('-')[1])
-      ranks.add(r)
+      ranks.push(Number(id.split('-')[1]))
     }
-    for (let r = 1; r <= 7; r++) {
-      if (ranks.has(r) && ranks.has(r + 1) && ranks.has(r + 2)) return false
+    ranks.sort((a, b) => a - b)
+    for (let i = 1; i < ranks.length; i++) {
+      if (ranks[i]! - ranks[i - 1]! < 3) return false
     }
   }
   return true
@@ -193,26 +193,33 @@ export function isReady(hand: TileId[], melds: Meld[]): boolean {
   return waitingTiles(hand, melds).length > 0
 }
 
-/** 對碰：聽一張，手上已有一對 */
+/**
+ * 對碰：糊牌用來湊成刻（手上原有一對），唔係做眼、唔係入順。
+ * （舊邏輯只睇「手上有兩隻糊牌」會誤判 55 眼＋456 食 5）
+ */
 export function isDuiPengWait(
   hand: TileId[],
   melds: Meld[],
   winTile: TileId,
 ): boolean {
-  const waits = waitingTiles(hand, melds)
-  if (waits.length !== 1 || waits[0] !== winTile) return false
-  return hand.filter((t) => t === winTile).length === 2
+  if (hand.filter((t) => t === winTile).length !== 2) return false
+  const parts = findStandardWins(hand, melds, winTile)
+  return parts.some(
+    (p) =>
+      p.pair !== winTile &&
+      p.melds.some((m) => m.kind === 'pong' && m.tiles[0] === winTile),
+  )
 }
 
-/** 獨獨（單騎） */
+/** 獨獨（單騎）：糊牌用來湊眼，食前手上冇呢隻 */
 export function isDuduWait(
   hand: TileId[],
   melds: Meld[],
   winTile: TileId,
 ): boolean {
-  const waits = waitingTiles(hand, melds)
-  if (waits.length !== 1 || waits[0] !== winTile) return false
-  return hand.filter((t) => t === winTile).length === 0
+  if (hand.filter((t) => t === winTile).length !== 0) return false
+  const parts = findStandardWins(hand, melds, winTile)
+  return parts.some((p) => p.pair === winTile)
 }
 
 export function isAllChiPartition(p: WinPartition, exposed: Meld[]): boolean {

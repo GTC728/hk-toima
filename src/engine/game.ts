@@ -1,4 +1,5 @@
 import { calculateFans } from './fan'
+import { amountFromFan, diAmount } from './score'
 import {
   canAnKong,
   canJiaGang,
@@ -23,7 +24,7 @@ import type {
   TileId,
   WinResult,
 } from './types'
-import { DEFAULT_RULES } from './types'
+import { DEFAULT_RULES, DEFAULT_STARTING_CASH } from './types'
 
 /** 東南西北標籤（圈／局） */
 export const WIND_LABELS = ['東', '南', '西', '北'] as const
@@ -61,11 +62,26 @@ import { dealWall, drawFromDead, drawFromLive, wallRemaining } from './wall'
 import { canWin, isReady, waitingTiles } from './win-check'
 
 /** 正花：東家春／梅、南夏／蘭、西秋／菊、北冬／竹 */
-const ZHENG_HUA: Record<Seat, TileId[]> = {
+export const ZHENG_HUA: Record<Seat, TileId[]> = {
   0: ['flower-spring', 'flower-plum'],
   1: ['flower-summer', 'flower-orchid'],
   2: ['flower-autumn', 'flower-chrysanthemum'],
   3: ['flower-winter', 'flower-bamboo'],
+}
+
+export function zhengHuaForSeat(seat: Seat): TileId[] {
+  return ZHENG_HUA[seat] ?? []
+}
+
+function applyCashTransfer(
+  state: GameState,
+  from: Seat,
+  to: Seat,
+  amount: number,
+): void {
+  if (from === to || amount <= 0) return
+  state.players[from]!.cash -= amount
+  state.players[to]!.cash += amount
 }
 
 function payInstant(
@@ -76,12 +92,23 @@ function payInstant(
   reason: string,
 ): void {
   if (from === to || amount <= 0) return
+  applyCashTransfer(state, from, to, amount)
   state.instantPayouts.push({ from, to, amount, reason })
   log(state, `即付 ${reason}: seat ${from} → ${to} $${amount}`)
 }
 
+/** 拉帳結清／斬拉等：入金池 */
+function applySettledPayouts(
+  state: GameState,
+  settled: { from: Seat; to: Seat; amount: number; reason: string }[],
+): void {
+  for (const s of settled) {
+    applyCashTransfer(state, s.from, s.to, s.amount)
+  }
+}
+
 function payOthersBase(state: GameState, to: Seat, reason: string, amount?: number): void {
-  const amt = amount ?? state.rules.base
+  const amt = amount ?? diAmount(state.rules)
   for (let s = 0; s < 4; s++) {
     if (s === to) continue
     payInstant(state, s as Seat, to, amt, reason)
@@ -96,13 +123,14 @@ function applyDiceBonuses(state: GameState): void {
   } else if (sorted[0] === 1 && sorted[1] === 2 && sorted[2] === 3) {
     for (let s = 0; s < 4; s++) {
       if (s === state.dealer) continue
-      payInstant(state, state.dealer, s as Seat, state.rules.base, '一二三')
+      payInstant(state, state.dealer, s as Seat, diAmount(state.rules), '一二三')
     }
   }
 }
 
+/** 即時賞罰：純番數 × 番值（唔再另加底） */
 function fanAmount(state: GameState, fan: number): number {
-  return state.rules.base + fan * state.rules.fanValue
+  return amountFromFan(state.rules, fan)
 }
 
 /** 補花／摸花後檢查一台花／草、七搶一、八仙 */
@@ -122,20 +150,21 @@ function checkFlowerInstantBonuses(state: GameState, seat: Seat): void {
     payOthersBase(state, seat, '一台草', amt)
   }
 
-  if (flowers.length === 8) {
+  if (flowers.length === 8 && !state.claimedFlowerSpecial) {
+    state.claimedFlowerSpecial = true
     const amt = fanAmount(state, 100)
     payOthersBase(state, seat, '八仙過海', amt)
   }
 
   // 七搶一／一搶七：總共 8 花，有人 7 隻、另一人摸到第 8
-  if (flowers.length >= 1) {
+  if (flowers.length >= 1 && !state.claimedFlowerSpecial) {
     const counts = state.players.map((p) => p.flowers.length)
     const total = counts.reduce((s, n) => s + n, 0)
     if (total === 8) {
       const seven = counts.findIndex((n) => n === 7)
       const one = counts.findIndex((n) => n === 1)
       if (seven >= 0 && one >= 0 && seven !== one) {
-        // 摸第 8 隻嘅人（seat）若係 1 隻方 → 七搶一；若係 7 隻方 → 一搶七
+        state.claimedFlowerSpecial = true
         const amt = fanAmount(state, 30)
         if (seat === one && counts[seven] === 7) {
           payInstant(state, seat, seven as Seat, amt, '七搶一')
@@ -147,7 +176,7 @@ function checkFlowerInstantBonuses(state: GameState, seat: Seat): void {
   }
 }
 
-function emptyPlayer(): PlayerState {
+function emptyPlayer(cash = DEFAULT_STARTING_CASH): PlayerState {
   return {
     hand: [],
     melds: [],
@@ -156,6 +185,7 @@ function emptyPlayer(): PlayerState {
     ding: null,
     passedPong: [],
     passedWinThisLap: false,
+    cash,
   }
 }
 
@@ -213,6 +243,8 @@ function supplementFromDead(state: GameState, seat: Seat): void {
     )
     state.deadWallIndex = deadIndex
     p.hand.push(tile)
+    state.flowerDrawChain += 1
+    state.lastSupplement = 'flower'
     log(state, `seat ${seat} 補花 ${flower} → ${tile}`)
   }
   checkFlowerInstantBonuses(state, seat)
@@ -232,6 +264,8 @@ function drawSupplementTile(state: GameState, seat: Seat): void {
   state.deadWallIndex = deadIndex
   p.hand.push(tile)
   state.justDrawn = tile
+  state.kongDrawChain += 1
+  state.lastSupplement = 'kong'
   if (isFlower(tile)) {
     supplementFromDead(state, seat)
     if (state.phase === 'round_over') return
@@ -277,6 +311,10 @@ function drawForCurrent(state: GameState): void {
   state.liveIndex = liveIndex
   const seat = state.currentSeat
   const p = state.players[seat]
+  // 普通摸牌重置補牌鏈（除非摸到花會再開鏈）
+  state.flowerDrawChain = 0
+  state.kongDrawChain = 0
+  state.lastSupplement = null
   p.hand.push(tile)
   state.justDrawn = tile
   log(state, `seat ${seat} 摸 ${tile}`)
@@ -289,6 +327,23 @@ function drawForCurrent(state: GameState): void {
   checkFlowerInstantBonuses(state, seat)
   p.passedWinThisLap = false
   state.mustDiscard = false
+}
+
+/** 河＋各家副露可見嘅某隻牌張數 */
+function countVisibleTile(state: GameState, tile: TileId, exceptSeat: Seat): number {
+  let n = 0
+  for (let s = 0; s < 4; s++) {
+    const p = state.players[s as Seat]
+    n += p.discards.filter((t) => t === tile).length
+    for (const m of p.melds) {
+      // 暗槓對其他人唔見；計絕張時暗槓仍占張
+      n += m.tiles.filter((t) => t === tile).length
+    }
+    if (s !== exceptSeat) {
+      // 唔計對手手牌
+    }
+  }
+  return n
 }
 
 function interruptIppatsu(state: GameState): void {
@@ -310,6 +365,15 @@ function applyWins(
     const p = state.players[seat]
     const hand =
       winType === 'tsumo' ? removeOne(p.hand, winTile) : [...p.hand]
+    let visible = countVisibleTile(state, winTile, seat)
+    // 出銃嗰張唔計入「已見」（先有 N 張再開呢張）
+    if (
+      (winType === 'ron' || winType === 'chankan') &&
+      discarder != null
+    ) {
+      const d = state.players[discarder].discards
+      if (d[d.length - 1] === winTile) visible = Math.max(0, visible - 1)
+    }
     results.push(
       buildWinResult({
         seat,
@@ -328,12 +392,24 @@ function applyWins(
         multiRonCount: winners.length,
         discarderIsDealer: discarder === state.dealer,
         zhengHuaTiles: ZHENG_HUA[seat],
+        flowerDrawChain:
+          winType === 'tsumo' && seat === state.currentSeat
+            ? state.flowerDrawChain
+            : 0,
+        kongDrawChain:
+          winType === 'tsumo' && seat === state.currentSeat
+            ? state.kongDrawChain
+            : 0,
+        visibleWinTileCount: visible,
+        fanxue: winners.length >= 2,
+        windRound: state.windRound,
       }),
     )
   }
 
   const la = applyWinToLa(state.laLedger, results, state.rules.maxLaKou)
   state.laLedger = la.ledger
+  applySettledPayouts(state, la.settled)
   state.instantPayouts.push(...la.settled)
 
   const dealerWon = winners.includes(state.dealer)
@@ -532,7 +608,13 @@ export function createGame(config: GameConfig = {}): GameState {
     lastInterruptIppatsu: false,
     claimedYitaihua: false,
     claimedYitaicao: false,
+    claimedFlowerSpecial: false,
     discardsThisRound: 0,
+    flowerDrawChain: 0,
+    kongDrawChain: 0,
+    lastSupplement: null,
+    chaseTile: null,
+    chaseSeats: [],
     round: 1,
     windRound: 0,
     laLedger: [],
@@ -585,6 +667,26 @@ export function applyAction(
       next.justDrawn = null
       next.mustDiscard = false
       next.discardsThisRound += 1
+      // 打牌後補牌鏈結束（花摸／槓摸只喺補牌即食）
+      next.flowerDrawChain = 0
+      next.kongDrawChain = 0
+      next.lastSupplement = null
+
+      // 追：四家連續打同一隻，第一家賠其他三家各一底
+      if (next.chaseTile === action.tile) {
+        if (!next.chaseSeats.includes(seat)) next.chaseSeats.push(seat)
+      } else {
+        next.chaseTile = action.tile
+        next.chaseSeats = [seat]
+      }
+      if (next.chaseSeats.length >= 4) {
+        const first = next.chaseSeats[0]!
+        for (const s of next.chaseSeats.slice(1)) {
+          payInstant(next, first, s, diAmount(next.rules), '追')
+        }
+        next.chaseTile = null
+        next.chaseSeats = []
+      }
 
       if (action.declareDing) {
         if (p.ding) throw new Error('already ding')
@@ -650,15 +752,8 @@ export function applyAction(
       })
       interruptIppatsu(next)
       drawSupplementTile(next, seat)
-      for (let s = 0; s < 4; s++) {
-        if (s === seat) continue
-        next.instantPayouts.push({
-          from: s as Seat,
-          to: seat,
-          amount: next.rules.base,
-          reason: '暗槓',
-        })
-      }
+      // 暗槓收底：即時入金池（先前只記帳唔扣錢，跨局金池唔會變）
+      payOthersBase(next, seat, '暗槓收底')
       log(next, `seat ${seat} 暗槓 ${action.tile}`)
       break
     }
@@ -763,12 +858,14 @@ export function applyAction(
       }
       const r = chopLa(next.laLedger, action.creditor, action.debtor)
       next.laLedger = r.ledger
+      applySettledPayouts(next, r.settled)
       next.instantPayouts.push(...r.settled)
       break
     }
     case 'settleAll': {
       const r = settleAllLa(next.laLedger)
       next.laLedger = r.ledger
+      applySettledPayouts(next, r.settled)
       next.instantPayouts.push(...r.settled)
       break
     }
@@ -795,7 +892,16 @@ export function applyAction(
         dealerSeat: newDealer,
         consecutiveDealerWins: newConsecutive,
       })
-      fresh.laLedger = next.laLedger
+      // 帶過拉帳＋金池；清走上鋪顯示用嘅 lastHand／prev
+      fresh.laLedger = next.laLedger.map((e) => ({
+        creditor: e.creditor,
+        debtor: e.debtor,
+        amount: e.amount,
+        kou: e.kou,
+      }))
+      for (let i = 0; i < 4; i++) {
+        fresh.players[i]!.cash = next.players[i]!.cash
+      }
       fresh.round = next.round + 1
       fresh.windRound = circleDone ? nextWind : next.windRound
       // 延續整場 actionLog；唔保留 createGame 嘅 start
@@ -825,16 +931,32 @@ export function getLegalActions(state: GameState, seat: Seat): Action[] {
     state.pendingDiscard?.awaiting.includes(seat)
   ) {
     const tile = state.pendingDiscard.tile
+    const submitted = state.pendingDiscard.claims.filter((c) => c.kind !== 'pass')
+    const claimedWin = submitted.some((c) => c.kind === 'win')
+    const claimedKong = submitted.some((c) => c.kind === 'kong')
+    const claimedPong = submitted.some((c) => c.kind === 'pong')
     actions.push({ type: 'pass' })
     if (!p.ding?.guoshuiLocked && !(p.passedWinThisLap && !p.ding)) {
       if (canWin(p.hand, p.melds, tile)) actions.push({ type: 'win' })
     }
-    if (!state.chankan && !p.ding) {
-      if (canMingKong(p.hand, tile)) actions.push({ type: 'mingkong' })
-      if (canPong(p.hand, tile) && !p.passedPong.includes(tile)) {
+    // 已有更高優先鳴牌 → 唔再顯示可上／可碰（避免「俾人搶咗仲顯示可攞」）
+    if (!state.chankan && !p.ding && !claimedWin) {
+      if (!claimedKong && canMingKong(p.hand, tile)) {
+        actions.push({ type: 'mingkong' })
+      }
+      if (
+        !claimedKong &&
+        !claimedPong &&
+        canPong(p.hand, tile) &&
+        !p.passedPong.includes(tile)
+      ) {
         actions.push({ type: 'pong' })
       }
-      if (seat === nextSeat(state.pendingDiscard.seat)) {
+      if (
+        !claimedKong &&
+        !claimedPong &&
+        seat === nextSeat(state.pendingDiscard.seat)
+      ) {
         for (const tiles of findChiOptions(p.hand, tile)) {
           actions.push({ type: 'chi', tiles })
         }
@@ -898,10 +1020,10 @@ export function getLegalActions(state: GameState, seat: Seat): Action[] {
   return actions
 }
 
-/** 對無法鳴牌嘅座位自動 pass，方便測試／AI */
+/** 對無法鳴牌／已被更高優先搶去嘅座位自動 pass */
 export function autoPassImpossibleClaims(state: GameState): GameState {
   let s = state
-  let guard = 8
+  let guard = 12
   while (s.phase === 'claim_window' && s.pendingDiscard && guard-- > 0) {
     const pending = s.pendingDiscard
     if (pending.awaiting.length === 0) break
@@ -962,6 +1084,7 @@ export function getPublicView(
       discards: p.discards,
       ding: p.ding,
       isDealer: i === state.dealer,
+      cash: p.cash,
     })),
     pendingDiscard: state.pendingDiscard,
     justDrawnVisible: state.justDrawn !== null,

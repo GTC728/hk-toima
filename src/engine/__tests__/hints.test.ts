@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getWaitingTiles, hintDiscard } from '../hints'
+import { getWaitingTiles, hintDiscard, timeoutPlayAction } from '../hints'
 import { createGame } from '../game'
 import type { TileId } from '../types'
 import { waitingTiles } from '../win-check'
@@ -57,5 +57,34 @@ describe('hintDiscard', () => {
     g.mustDiscard = false
     const hint = hintDiscard(g, seat)
     expect(hint === 'wind-north' || hint === 'wind-east').toBe(true)
+  })
+})
+
+describe('timeoutPlayAction', () => {
+  it('without hints discards justDrawn', () => {
+    const g = createGame({ seed: 42 })
+    const seat = g.currentSeat
+    const drawn = g.justDrawn!
+    const action = timeoutPlayAction(g, seat, { preferAiDiscard: false })
+    expect(action).toEqual({ type: 'discard', tile: drawn })
+  })
+
+  it('with hints discards AI recommendation', () => {
+    const g = createGame({ seed: 1 })
+    const seat = g.currentSeat
+    g.players[seat].hand = [
+      'man-1', 'man-2', 'man-3',
+      'man-4', 'man-5', 'man-6',
+      'pin-1', 'pin-2', 'pin-3',
+      'sou-1', 'sou-2', 'sou-3',
+      'pin-7', 'pin-8', 'pin-9',
+      'wind-north',
+      'wind-east',
+    ]
+    g.justDrawn = 'wind-east'
+    g.mustDiscard = false
+    const hint = hintDiscard(g, seat)
+    const action = timeoutPlayAction(g, seat, { preferAiDiscard: true })
+    expect(action).toEqual({ type: 'discard', tile: hint })
   })
 })

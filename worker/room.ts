@@ -12,6 +12,7 @@ import {
   getLegalActions,
   getPrivateView,
   getPublicView,
+  timeoutPlayAction,
   type Action,
   type GameState,
   type Seat,
@@ -656,11 +657,8 @@ export class RoomDurableObject {
     if (!this.room?.game || this.room.game.phase !== 'playing') return
     const seat = this.room.game.currentSeat
     let s = this.room.game
-    const choice =
-      chooseAiAction(s, seat) ??
-      (getLegalActions(s, seat).some((a) => a.type === 'pass')
-        ? ({ type: 'pass' } as Action)
-        : null)
+    // 網上無練習提示：超時打最新摸入；可糊仍自動糊
+    const choice = timeoutPlayAction(s, seat, { preferAiDiscard: false })
     if (!choice) {
       // Still refresh timer so we don't spin alarms forever
       this.noteTimers(s, true)
@@ -680,7 +678,11 @@ export class RoomDurableObject {
     this.room.game = s
     this.noteTimers(s, true)
     await this.save()
-    this.broadcastEvent('出牌時限到，自動行動')
+    this.broadcastEvent(
+      choice.type === 'discard'
+        ? `出牌時限到，自動打 ${choice.tile}`
+        : '出牌時限到，自動行動',
+    )
     this.broadcastGame()
     await this.scheduleNextTick()
   }

@@ -138,4 +138,16 @@ describe('actionLog', () => {
     expect(g.actionLog.at(-1)?.note).toBe('match_over')
     expect(g.actionLog.at(-1)?.action).toEqual({ type: 'nextRound', seed: 88 })
   })
+
+  it('四家預設金池，nextRound 繼承加扣', () => {
+    let g = createGame({ seed: 20, dealerSeat: 0 })
+    expect(g.players.every((p) => p.cash === 2000)).toBe(true)
+    g.players[0]!.cash = 2100
+    g.players[1]!.cash = 1900
+    g.players[2]!.cash = 2050
+    g.players[3]!.cash = 1950
+    g = forceRoundOver(g, 0, 0)
+    g = applyAction(g, { type: 'nextRound', seed: 21 })
+    expect(g.players.map((p) => p.cash)).toEqual([2100, 1900, 2050, 1950])
+  })
 })

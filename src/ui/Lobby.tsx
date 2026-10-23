@@ -14,6 +14,7 @@ import {
   saveRoomSession,
 } from './online/session'
 import { isMuted, setMuted } from './audio'
+import { buildSeatNames, resolveStartNames } from './playerNames'
 
 const SEAT_LABELS = ['東', '南', '西', '北'] as const
 
@@ -32,6 +33,7 @@ interface LobbyProps {
   onEnterOnline: (join: JoinResponse, name: string, rules: RulesDraft) => void
   onOpenFans: () => void
   onOpenCalculator?: () => void
+  onOpenLaBook?: () => void
   onOpenTutorial?: () => void
   onOpenStats?: () => void
 }
@@ -41,13 +43,16 @@ export function Lobby({
   onEnterOnline,
   onOpenFans,
   onOpenCalculator,
+  onOpenLaBook,
   onOpenTutorial,
   onOpenStats,
 }: LobbyProps) {
   const saved = loadRoomSession()
   const [mode, setMode] = useState<LobbyMode>('local')
   const [human, setHuman] = useState<boolean[]>([true, false, false, false])
-  const [names, setNames] = useState(['東家', '南家', '西家', '北家'])
+  const [names, setNames] = useState(() =>
+    buildSeatNames([true, false, false, false]),
+  )
   const [rules, setRules] = useState<RulesDraft>({ ...DEFAULT_RULES_DRAFT })
   /** 本機預設開、網上預設關 */
   const [practiceHints, setPracticeHints] = useState(true)
@@ -64,12 +69,15 @@ export function Lobby({
       const next = [...prev]
       if (next[seat] && humanCount <= 1) return prev
       next[seat] = !next[seat]
+      setNames(buildSeatNames(next))
       return next
     })
   }
 
   function setAllHuman(count: number) {
-    setHuman([0, 1, 2, 3].map((i) => i < count))
+    const next = [0, 1, 2, 3].map((i) => i < count)
+    setHuman(next)
+    setNames(buildSeatNames(next))
   }
 
   async function handleCreate() {
@@ -257,9 +265,7 @@ export function Lobby({
               onClick={() =>
                 onStartLocal({
                   humanSeats: human,
-                  names: names.map((n, i) =>
-                    human[i] ? n || SEAT_LABELS[i]! : `AI·${SEAT_LABELS[i]}`,
-                  ),
+                  names: resolveStartNames(human, names),
                   rules,
                   practiceHints,
                 })
@@ -368,6 +374,15 @@ export function Lobby({
             onClick={onOpenCalculator}
           >
             計番機
+          </button>
+        )}
+        {onOpenLaBook && (
+          <button
+            type="button"
+            className="lobby__link"
+            onClick={onOpenLaBook}
+          >
+            拉數簿
           </button>
         )}
         {onOpenTutorial && (

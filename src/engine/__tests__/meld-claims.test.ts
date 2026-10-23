@@ -130,4 +130,44 @@ describe('discard flow', () => {
         g.phase === 'claim_window',
     ).toBe(true)
   })
+
+  it('有人提交碰之後，上家唔再見到可上', () => {
+    let g = createGame({ seed: 1 })
+    g.currentSeat = 0
+    g.phase = 'playing'
+    g.justDrawn = 'man-5'
+    g.players[0].hand = [
+      'man-5', 'sou-1', 'sou-2', 'sou-3', 'sou-4', 'sou-5', 'sou-6', 'sou-7',
+      'sou-8', 'sou-9', 'pin-1', 'pin-2', 'pin-3', 'pin-4', 'pin-5', 'pin-6', 'pin-7',
+    ]
+    g.players[1].hand = [
+      'man-3', 'man-4', 'pin-1', 'pin-1', 'pin-2', 'pin-2', 'pin-3', 'pin-3',
+      'sou-1', 'sou-1', 'sou-2', 'sou-2', 'sou-3', 'sou-3', 'wind-east', 'wind-east',
+    ]
+    g.players[2].hand = [
+      'man-5', 'man-5', 'pin-4', 'pin-4', 'pin-5', 'pin-5', 'pin-6', 'pin-6',
+      'sou-4', 'sou-4', 'sou-5', 'sou-5', 'sou-6', 'sou-6', 'wind-south', 'wind-south',
+    ]
+    g.players[3].hand = [
+      'dragon-zhong', 'dragon-zhong', 'dragon-fa', 'dragon-fa',
+      'wind-west', 'wind-west', 'wind-north', 'wind-north',
+      'man-1', 'man-1', 'man-2', 'man-2', 'man-7', 'man-7', 'man-8', 'man-8',
+    ]
+
+    g = applyAction(g, { type: 'discard', tile: 'man-5' }, 0)
+    expect(getLegalActions(g, 1).some((a) => a.type === 'chi')).toBe(true)
+
+    g = applyAction(g, { type: 'pong' }, 2)
+    const legalChiSeat = getLegalActions(g, 1)
+    // 更高優先已提交 → 唔再顯示上／碰／槓（可食仍保留）
+    expect(legalChiSeat.some((a) => a.type === 'chi')).toBe(false)
+    expect(legalChiSeat.some((a) => a.type === 'pong')).toBe(false)
+    expect(legalChiSeat.some((a) => a.type === 'mingkong')).toBe(false)
+    expect(legalChiSeat.some((a) => a.type === 'pass')).toBe(true)
+
+    g = applyAction(g, { type: 'pass' }, 1)
+    g = autoPassImpossibleClaims(g)
+    expect(g.phase).toBe('playing')
+    expect(g.currentSeat).toBe(2)
+  })
 })

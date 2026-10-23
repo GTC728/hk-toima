@@ -158,7 +158,7 @@ export function FanCalculator({ onBack }: FanCalculatorProps) {
   const result = useMemo(() => {
     if (!winTile || hand.length === 0) return null
     try {
-      const fans = calculateFans({
+      const pattern = calculateFans({
         hand,
         melds,
         flowers,
@@ -169,6 +169,10 @@ export function FanCalculator({ onBack }: FanCalculatorProps) {
         consecutiveWins: 0,
         seat: isDealer ? 0 : 1,
       })
+      const fans = [
+        { id: 'di', name: '底', value: Math.max(0, base) },
+        ...pattern,
+      ]
       const fan = totalFan(fans)
       const amount = amountFromFan(
         { ...DEFAULT_RULES, base, fanValue },
@@ -221,21 +225,23 @@ export function FanCalculator({ onBack }: FanCalculatorProps) {
           <span>莊家</span>
         </label>
         <label className="calc-page__num">
-          <span>底</span>
+          <span>底（番）</span>
           <input
             type="number"
             min={0}
             value={base}
             onChange={(e) => setBase(Number(e.target.value) || 0)}
+            aria-label="底番數"
           />
         </label>
         <label className="calc-page__num">
-          <span>番值</span>
+          <span>$／番</span>
           <input
             type="number"
             min={0}
             value={fanValue}
             onChange={(e) => setFanValue(Number(e.target.value) || 0)}
+            aria-label="番值"
           />
         </label>
         <button type="button" className="lobby__secondary" onClick={resetAll}>
@@ -436,8 +442,8 @@ export function FanCalculator({ onBack }: FanCalculatorProps) {
               共 <strong>{result.fan}</strong> 番 · 金額{' '}
               <strong>${result.amount}</strong>
               <span className="calc-page__amount-hint">
-                （底 {base} + 番 × {fanValue}
-                {winType === 'tsumo' ? '；自摸每家付呢個數' : '；出銃者付'}）
+                （總番×${fanValue}；底 {base} 番已計入
+                {winType === 'tsumo' ? '；自摸每家付' : '；出銃者付'}）
               </span>
             </p>
           </>

@@ -14,22 +14,57 @@ export {
   windRoundLabel,
   dealerRoundLabel,
   matchRoundLabel,
+  ZHENG_HUA,
+  zhengHuaForSeat,
 } from './game'
 export { chooseAiAction, discardKeepScore, visibleTileCounts } from './ai'
-export { hintDiscard, getWaitingTiles } from './hints'
+export { hintDiscard, getWaitingTiles, timeoutPlayAction } from './hints'
 export {
   deadlineFromOpened,
   isExpired,
   remainingSec,
 } from './turn-timer'
 export { canWin, isReady, waitingTiles, findStandardWins, isLiguligu, isThirteenOrphans } from './win-check'
-export { calculateFans, totalFan, checkMenqing, fansTable } from './fan'
-export { amountFromFan, buildWinResult, dealerExtraFan, examplePinghuWuziZimo } from './score'
-export { applyWinToLa, chopLa, settleAllLa, canChopLa } from './la'
-export { createFullWall, parseTile, sortTiles, tileId, isFlower, isHonor } from './tiles'
+export {
+  calculateFans,
+  pickBestWinPartition,
+  totalFan,
+  checkMenqing,
+  fansTable,
+  allFanMetas,
+  getFanMeta,
+  fanDescription,
+  fanDisplayName,
+  FAN_TABLE_META,
+} from './fan'
+export type { FanMeta } from './fan-catalog'
+export {
+  amountFromFan,
+  buildWinResult,
+  dealerExtraFan,
+  diAmount,
+  examplePinghuWuziZimo,
+} from './score'
+export {
+  applyWinToLa,
+  chopLa,
+  settleAllLa,
+  canChopLa,
+  formatLaFanDebt,
+  laDeltaForSeat,
+} from './la'
+export {
+  createFullWall,
+  parseTile,
+  sortTiles,
+  tileId,
+  isFlower,
+  isHonor,
+  isSuitTile,
+} from './tiles'
 export { dealWall, wallRemaining } from './wall'
 export { makeMeld } from './meld'
-export { DEFAULT_RULES } from './types'
+export { DEFAULT_RULES, DEFAULT_STARTING_CASH } from './types'
 export type {
   Action,
   ActionLogEntry,
@@ -44,6 +79,7 @@ export type {
   PlayerState,
   PrivateGameView,
   PublicGameView,
+  PublicPlayerView,
   RoundResult,
   Seat,
   TableRules,

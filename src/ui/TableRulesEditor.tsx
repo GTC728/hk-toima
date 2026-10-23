@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, type TableRules } from '../engine'
+import { DEFAULT_RULES, diAmount, type TableRules } from '../engine'
 
 export type RulesDraft = Pick<
   TableRules,
@@ -25,7 +25,6 @@ interface TableRulesEditorProps {
   value: RulesDraft
   onChange: (next: RulesDraft) => void
   disabled?: boolean
-  /** 改動時即時回傳（網上房主同步） */
   onCommit?: (next: RulesDraft) => void
 }
 
@@ -40,6 +39,7 @@ export function TableRulesEditor({
     if (!Number.isFinite(n) || n < 0) return
     let v = Math.floor(n)
     if (key === 'matchCircles') v = Math.min(4, Math.max(1, v || 1))
+    if (key === 'base') v = Math.min(20, Math.max(0, v))
     if (key === 'turnTimeoutSec' || key === 'claimTimeoutSec') {
       v = Math.min(120, Math.max(3, v || 3))
     }
@@ -47,6 +47,8 @@ export function TableRulesEditor({
     onChange(next)
     onCommit?.(next)
   }
+
+  const diCash = diAmount(value as TableRules)
 
   return (
     <fieldset className="rules-editor" disabled={disabled}>
@@ -57,12 +59,13 @@ export function TableRulesEditor({
           <input
             type="number"
             min={0}
+            max={20}
             step={1}
             value={value.base}
             onChange={(e) => setField('base', e.target.value)}
-            aria-label="底"
+            aria-label="底番數"
           />
-          <em>$</em>
+          <em>番</em>
         </label>
         <label className="rules-editor__field">
           <span>番值</span>
@@ -142,9 +145,10 @@ export function TableRulesEditor({
         </label>
       </div>
       <p className="rules-editor__hint" aria-live="polite">
-        而家 ${value.base} 底 · ${value.fanValue} 一番 · 拉 {value.maxLaKou} 口 ·
-        五同順 {value.fiveTongShunFan} 番 · 出牌 {value.turnTimeoutSec}s · 鳴牌{' '}
-        {value.claimTimeoutSec}s · {value.matchCircles} 圈
+        預設番表＝坊間眾數（全求人15等；五同順 {value.fiveTongShunFan} 番、計後唔再計般高相逢）·
+        底 {value.base} 番（計入總番）· 一番 ${value.fanValue} · 一個底＝$
+        {diCash} · 銀碼＝總番×番值 · 拉 {value.maxLaKou} 口 ·{' '}
+        {value.matchCircles} 圈
       </p>
     </fieldset>
   )
