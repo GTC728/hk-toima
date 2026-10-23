@@ -2136,6 +2136,27 @@ span.tile {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
 }
 
+/* 電腦：結算用橫向空間，四家並排兩欄，唔再一條窄直欄 */
+@media (min-width: 960px) {
+  .settlement {
+    align-items: start;
+    padding: 1.25rem 1.75rem 1.5rem;
+  }
+
+  .settlement__panel {
+    width: min(1280px, 100%);
+    max-height: min(96vh, 1100px);
+    padding: 1.4rem 1.5rem 1.6rem;
+  }
+
+  .settlement__stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    align-items: start;
+  }
+}
+
 .settlement__title {
   margin: 0;
   font-family: var(--font-display);
@@ -2419,6 +2440,14 @@ span.tile {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+@media (min-width: 960px) {
+  .settlement__fans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 0.45rem;
+  }
 }
 
 .settlement__fan-btn {
