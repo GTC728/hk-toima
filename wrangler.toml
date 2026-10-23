@@ -19,4 +19,5 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RoomDurableObject"]
+# Free plan／新帳號必須用 SQLite-backed DO（唔可以用 new_classes）
+new_sqlite_classes = ["RoomDurableObject"]
