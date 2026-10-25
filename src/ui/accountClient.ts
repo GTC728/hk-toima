@@ -486,7 +486,12 @@ export async function fetchRoomPeers(
 }
 
 export async function challengeFriend(friendshipId: string): Promise<
-  | { ok: true; roomCode: string; join: { code: string; seat: number; seatToken: string; wsPath: string }; expiresAt: number }
+  | {
+      ok: true
+      roomCode: string
+      join: import('../../worker/protocol').JoinResponse
+      expiresAt: number
+    }
   | { ok: false; error: string }
 > {
   try {
@@ -523,7 +528,7 @@ export async function challengeFriend(friendshipId: string): Promise<
       expiresAt: challenge.expiresAt,
       join: {
         code: join.code,
-        seat: join.seat as 0 | 1 | 2 | 3,
+        seat: join.seat as import('../../worker/protocol').JoinResponse['seat'],
         seatToken: join.seatToken,
         wsPath: join.wsPath,
       },

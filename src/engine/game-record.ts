@@ -210,9 +210,9 @@ export function gameRecordFromState(
 ): GameRecord {
   const players =
     opts?.players ??
-    state.players.map((p, i) => ({
+    state.players.map((_, i) => ({
       seat: i as Seat,
-      displayName: p.name,
+      displayName: `玩家-${i + 1}`,
       kind: 'human' as const,
     }))
   return {

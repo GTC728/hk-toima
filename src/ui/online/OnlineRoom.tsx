@@ -14,7 +14,6 @@ import {
   DEFAULT_RULES,
   DEFAULT_STARTING_CASH,
   isReady,
-  type AiPersona,
 } from '../../engine'
 import {
   noteFirstTenpai,

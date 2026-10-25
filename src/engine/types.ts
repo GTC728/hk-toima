@@ -119,7 +119,14 @@ export interface WinResult {
   /** 糊牌（出銃時唔喺贏家手牌內） */
   winTile: TileId
   discarder?: Seat
-  fans: { id: string; name: string; value: number }[]
+  fans: {
+    id: string
+    name: string
+    value: number
+    /** 雙食分舖 */
+    shop?: 'liguligu' | 'standard'
+    instance?: string
+  }[]
   totalFan: number
   /** 未計莊番前嘅牌型番 */
   handFan: number

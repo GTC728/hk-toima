@@ -139,6 +139,8 @@ export function tilesForFanHighlight(
   const chis = collectChis(partition, opts.melds)
 
   const addPong = (id: TileId, kong: boolean) => add(set, id, kong ? 4 : 3)
+  /** 暗牌（唔含水／副露）— 門清等番種用 */
+  const concealed = scoreHand
 
   const allTiles = () => [
     ...scoreHand,
