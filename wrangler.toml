@@ -14,10 +14,31 @@ run_worker_first = ["/api/*"]
 
 [durable_objects]
 bindings = [
-  { name = "ROOM", class_name = "RoomDurableObject" }
+  { name = "ROOM", class_name = "RoomDurableObject" },
+  { name = "MATCH", class_name = "MatchQueueDurableObject" }
 ]
 
 [[migrations]]
 tag = "v1"
 # Free plan／新帳號必須用 SQLite-backed DO（唔可以用 new_classes）
 new_sqlite_classes = ["RoomDurableObject"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["MatchQueueDurableObject"]
+
+# 帳戶（遠端 D1：hk-toima-accounts）
+[[d1_databases]]
+binding = "DB"
+database_name = "hk-toima-accounts"
+database_id = "c9c523c5-8110-4920-9ab6-3b2ae67f9157"
+migrations_dir = "migrations"
+
+[vars]
+ENVIRONMENT = "production"
+APP_ORIGIN = "https://hk-toima.greenteacake728.workers.dev"
+EMAIL_FROM = "noreply@opcg-tracker.com"
+
+# 寄信：域名已有 Resend DNS（send.opcg-tracker.com）。
+# 設 secret RESEND_API_KEY 後用 Resend HTTP；唔好開 Cloudflare Email Routing 以免改 apex MX。
+# Turnstile：secret TURNSTILE_SECRET_KEY（已用 API 寫入 Worker）

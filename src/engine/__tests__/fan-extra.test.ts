@@ -197,7 +197,8 @@ describe('expanded fans', () => {
       discardsThisRound: 20,
       kongDrawChain: 1,
     })
-    expect(fans.find((f) => f.id === 'gangmo')?.value).toBe(1)
+    // 偏高檔：槓摸單位 5（×n）
+    expect(fans.find((f) => f.id === 'gangmo')?.value).toBe(5)
   })
 
   it('明清龍', () => {
@@ -674,7 +675,7 @@ describe('expanded fans menqing', () => {
     expect(ids).not.toContain('mingsiguier')
   })
 
-  it('55＋食5入456順唔計對碰／獨獨（嵌張）', () => {
+  it('55＋食5入456順：中洞單聽＝獨獨，唔係對碰', () => {
     // 副露789萬；手：234萬 1234索 55索 6789索，食5索 → 456＋眼55
     const fans = calculateFans({
       hand: [
@@ -702,7 +703,7 @@ describe('expanded fans menqing', () => {
     })
     const ids = fans.map((f) => f.id)
     expect(ids).not.toContain('duipeng')
-    expect(ids).not.toContain('dudu')
+    expect(ids).toContain('dudu') // 中洞單聽
     const laoshao = fans.filter((f) => f.id === 'laoshao')
     expect(laoshao).toHaveLength(1)
     expect(laoshao[0]!.value).toBe(4) // 暗老少＝4，唔係兩次各2
@@ -740,7 +741,7 @@ describe('expanded fans menqing', () => {
     expect(fans.find((f) => f.id === 'lianzhuang')!.value).toBe(7)
   })
 
-  it('五暗刻唔再計對對糊', () => {
+  it('五暗坎同對對糊並計', () => {
     const fans = calculateFans({
       hand: [
         'man-1', 'man-1', 'man-1',
@@ -762,6 +763,148 @@ describe('expanded fans menqing', () => {
     })
     const ids = fans.map((f) => f.id)
     expect(ids).toContain('wuanake')
-    expect(ids).not.toContain('duiduihu')
+    expect(ids).toContain('duiduihu')
+  })
+
+  it('嚦咕雙食：型類可重計；偶然／糊法／對碰唔疊兩舖', () => {
+    const hand: TileId[] = [
+      'man-1', 'man-1',
+      'man-2', 'man-2',
+      'man-3', 'man-3',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7', 'man-7',
+      'man-8', 'man-8',
+    ]
+    const fans = calculateFans({
+      hand,
+      melds: [],
+      flowers: [],
+      winTile: 'man-1',
+      winType: 'tsumo',
+      ding: null,
+      isDealer: false,
+      consecutiveWins: 0,
+      seat: 1,
+      discardsThisRound: 20,
+    })
+    const ids = fans.map((f) => f.id)
+    expect(ids.filter((id) => id === 'liguligu')).toHaveLength(1)
+    expect(ids.filter((id) => id === 'qingyise')).toHaveLength(2)
+    // 偶然／糊法：只計一次；門清＋門清自摸並計，吞自摸
+    expect(ids.filter((id) => id === 'menqing')).toHaveLength(1)
+    expect(ids.filter((id) => id === 'menqing_zimo')).toHaveLength(1)
+    expect(ids.filter((id) => id === 'zimo')).toHaveLength(0)
+    expect(ids.filter((id) => id === 'wuzihua')).toHaveLength(1)
+    expect(fans.find((f) => f.id === 'menqing_zimo')?.shop).toBeUndefined()
+    expect(fans.find((f) => f.id === 'wuzihua')?.shop).toBeUndefined()
+    // 對碰最多一次（只屬標準聽口；嚦咕舖唔計）
+    expect(ids.filter((id) => id === 'duipeng').length).toBeLessThanOrEqual(1)
+    expect(fans.reduce((s, f) => s + f.value, 0)).toBeGreaterThan(40 + 80)
+    // 型類分舖；偶然番無 shop
+    expect(fans.find((f) => f.id === 'liguligu')?.shop).toBe('liguligu')
+    expect(
+      fans.filter((f) => f.id === 'qingyise').map((f) => f.shop).sort(),
+    ).toEqual(['liguligu', 'standard'])
+  })
+
+  it('雙食：花番只一次且無 shop（最頂共用行）', () => {
+    const hand: TileId[] = [
+      'man-1', 'man-1',
+      'man-2', 'man-2',
+      'man-3', 'man-3',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7', 'man-7',
+      'man-8', 'man-8',
+    ]
+    const fans = calculateFans({
+      hand,
+      melds: [],
+      flowers: [
+        'flower-plum',
+        'flower-orchid',
+        'flower-bamboo',
+        'flower-chrysanthemum',
+        'flower-winter',
+      ],
+      winTile: 'man-1',
+      winType: 'tsumo',
+      ding: null,
+      isDealer: false,
+      consecutiveWins: 0,
+      seat: 0,
+      zhengHuaTiles: ['flower-spring', 'flower-plum'],
+      discardsThisRound: 20,
+    })
+    const lan = fans.filter((f) => f.id === 'lanhua')
+    const zheng = fans.filter((f) => f.id === 'zhenghua')
+    expect(lan.length + zheng.length).toBeGreaterThan(0)
+    expect(lan.every((f) => f.shop === undefined)).toBe(true)
+    expect(zheng.every((f) => f.shop === undefined)).toBe(true)
+    expect(lan).toHaveLength(1)
+  })
+
+  it('純嚦咕（唔雙食）唔計對碰', () => {
+    // 七對＋一刻，但拆唔成五面子＋眼（加九萬對，無順／刻空間）
+    const hand: TileId[] = [
+      'man-1', 'man-1',
+      'man-3', 'man-3',
+      'man-5', 'man-5',
+      'man-7', 'man-7',
+      'man-9', 'man-9',
+      'pin-2', 'pin-2',
+      'pin-4', 'pin-4',
+      'pin-6', 'pin-6',
+    ]
+    expect(hand).toHaveLength(16)
+    const fans = calculateFans({
+      hand,
+      melds: [],
+      flowers: ['flower-spring'],
+      winTile: 'man-1',
+      winType: 'ron',
+      ding: null,
+      isDealer: false,
+      consecutiveWins: 0,
+      seat: 1,
+      discardsThisRound: 20,
+    })
+    const ids = fans.map((f) => f.id)
+    expect(ids).toContain('liguligu')
+    expect(ids).not.toContain('qingyise') // 兩門 → 唔雙食／唔清一色
+    expect(ids).not.toContain('duipeng')
+  })
+
+  it('未成糊（少牌清一色樣）唔計清一色／門清自摸', () => {
+    // 圖二類：差一對，唔係嚦咕亦唔係標準 17
+    const hand: TileId[] = [
+      'man-1', 'man-1',
+      'man-2', 'man-2',
+      'man-3',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7', 'man-7',
+      'man-8', 'man-8',
+    ]
+    expect(hand).toHaveLength(15)
+    const fans = calculateFans({
+      hand,
+      melds: [],
+      flowers: [],
+      winTile: 'man-1',
+      winType: 'tsumo',
+      ding: null,
+      isDealer: false,
+      consecutiveWins: 0,
+      seat: 1,
+      discardsThisRound: 20,
+    })
+    expect(fans.map((f) => f.id)).not.toContain('qingyise')
+    expect(fans.map((f) => f.id)).not.toContain('menqing_zimo')
+    expect(fans).toHaveLength(0)
   })
 })

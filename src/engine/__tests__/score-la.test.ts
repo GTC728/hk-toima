@@ -53,7 +53,7 @@ describe('score', () => {
   })
 
   it('plan example: 底+平胡+無字+自摸（坊間眾數）', () => {
-    expect(examplePinghuWuziZimo()).toBe(13)
+    expect(examplePinghuWuziZimo()).toBe(12)
 
     const fans = calculateFans({
       hand: [
@@ -88,8 +88,8 @@ describe('score', () => {
     const core = fans.filter((f) =>
       ['pinghu', 'wuzi', 'zimo'].includes(f.id),
     )
-    // 坊間眾數：平胡3＋無字1＋自摸1
-    expect(totalFan(core)).toBe(5)
+    // 偏高檔：平胡5＋無字1＋自摸1
+    expect(totalFan(core)).toBe(7)
 
     const rules: TableRules = { ...DEFAULT_RULES, base: 5, fanValue: 1 }
     const wr = buildWinResult({
@@ -159,6 +159,66 @@ describe('score', () => {
     expect(wr.payments[0]!.amount).toBe(
       amountFromFan(rules, wr.handFan + 1),
     )
+  })
+
+  it('反雪：一炮多響出銃者付款×2', () => {
+    const rules: TableRules = { ...DEFAULT_RULES, base: 5, fanValue: 2 }
+    // 16 張聽 man-6（同 meld-claims 叫糊形）
+    const hand = [
+      'man-1', 'man-2', 'man-3',
+      'man-4', 'man-5',
+      'pin-1', 'pin-2', 'pin-3',
+      'pin-7', 'pin-8', 'pin-9',
+      'sou-1', 'sou-2', 'sou-3',
+      'wind-east', 'wind-east',
+    ] as const
+    const common = {
+      seat: 1 as const,
+      hand: [...hand],
+      melds: [],
+      flowers: [] as const,
+      winTile: 'man-6' as const,
+      winType: 'ron' as const,
+      ding: null,
+      dealer: 0 as const,
+      consecutiveWins: 0,
+      discarder: 0 as const,
+      rules,
+      discardsThisRound: 20,
+      wallRemaining: 40,
+      multiRonCount: 2,
+    }
+    const plain = buildWinResult({ ...common, fanxue: false })
+    const doubled = buildWinResult({ ...common, fanxue: true })
+
+    expect(doubled.fans.some((f) => f.id === 'fanxue' && f.value === 0)).toBe(
+      true,
+    )
+    expect(doubled.fans.some((f) => f.id === 'shuangxiang')).toBe(true)
+    expect(plain.payments).toHaveLength(1)
+    expect(doubled.payments).toHaveLength(1)
+    expect(doubled.payments[0]!.from).toBe(0)
+    expect(doubled.payments[0]!.to).toBe(1)
+    expect(doubled.payments[0]!.amount).toBe(plain.payments[0]!.amount * 2)
+
+    // 出銃者係莊：相關番含莊番，再×2。鎖死銀碼，避免反雪退回只掛名。
+    // 無花偏高檔 1 → 銀碼跟住變
+    expect(plain.payments[0]!.amount).toBe(112)
+    expect(doubled.payments[0]!.amount).toBe(224)
+    expect(doubled.paymentPerPayer).toBe(224)
+
+    const { ledger, settled } = applyWinToLa([], [doubled], rules.maxLaKou)
+    expect(settled).toEqual([])
+    expect(ledger).toEqual([
+      {
+        creditor: 1,
+        debtor: 0,
+        amount: 224,
+        kou: 1,
+        lastHandAmount: 224,
+        prevAmount: 0,
+      },
+    ])
   })
 })
 

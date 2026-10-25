@@ -1,0 +1,200 @@
+/* 網站外殼組件：掣／卡／循環器 — 只准用 --shell-*／--accent */
+
+.shell-card {
+  background: var(--shell-panel);
+  color: var(--shell-text);
+  border: 1px solid var(--shell-line);
+  border-radius: 12px;
+  padding: 1rem 1.1rem 1.15rem;
+  box-shadow: 0 8px 28px color-mix(in srgb, #000 22%, transparent);
+}
+
+.shell-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--shell-muted);
+  text-transform: none;
+}
+
+.shell-card__foot {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--shell-line);
+}
+
+.shell-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: 700 0.95rem var(--font-ui);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.shell-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.shell-btn--primary {
+  width: 100%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+
+.shell-btn--primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+}
+
+.shell-btn--secondary {
+  background: var(--shell-elevated);
+  color: var(--shell-text);
+  border-color: var(--shell-line);
+}
+
+.shell-btn--secondary:not(:disabled):hover {
+  background: var(--shell-hover);
+}
+
+.shell-btn--ghost {
+  background: transparent;
+  color: var(--shell-muted);
+  border-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  font-weight: 600;
+}
+
+.shell-btn--ghost:not(:disabled):hover {
+  color: var(--shell-text);
+}
+
+.shell-btn--sm {
+  min-height: 2rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  border-radius: 8px;
+}
+
+.shell-cycler {
+  display: grid;
+  grid-template-columns: minmax(5rem, 7.5rem) 1fr;
+  gap: 0.55rem 0.85rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--shell-line);
+}
+
+.shell-cycler:last-child {
+  border-bottom: none;
+}
+
+.shell-cycler__label {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--shell-text);
+}
+
+.shell-cycler__control {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr 2.2rem;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.shell-cycler__btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-elevated);
+  color: var(--shell-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.shell-cycler__btn:hover:not(:disabled) {
+  background: var(--shell-hover);
+  border-color: var(--accent);
+}
+
+.shell-cycler__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.shell-cycler__value {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--shell-text);
+  font-variant-numeric: tabular-nums;
+  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  background: var(--shell-card);
+  border: 1px solid var(--shell-line);
+}
+
+.shell-cycler__unit {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--shell-muted);
+}
+
+.shell-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 10px;
+  background: var(--shell-card);
+}
+
+.shell-row.is-you {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.shell-row__main {
+  flex: 1;
+  min-width: 7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.shell-row__main strong {
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--shell-text);
+}
+
+.shell-row__main span {
+  font-size: 0.78rem;
+  color: var(--shell-muted);
+}
+
+.shell-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  background: var(--shell-elevated);
+  color: var(--shell-text);
+  font: 600 0.8rem var(--font-ui);
+}

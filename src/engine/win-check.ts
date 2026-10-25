@@ -78,6 +78,7 @@ function search(
 /**
  * 標準型：5 面子 + 1 對。
  * exposedMelds 已擺出；hand + winTile 為暗牌。
+ * 暗牌張數必須＝剩餘面子×3＋眼 2（門清即 17），唔夠／多都唔當標準糊。
  */
 export function findStandardWins(
   hand: TileId[],
@@ -87,6 +88,8 @@ export function findStandardWins(
   const remaining = 5 - exposedMelds.length
   if (remaining < 0) return []
   const tiles = [...hand, winTile]
+  const need = remaining * 3 + 2
+  if (tiles.length !== need) return []
   const base = countTiles(tiles)
   const fixed: WinPartition[] = []
 
@@ -109,13 +112,23 @@ export function findStandardWins(
   })
 }
 
-/** 嚦咕嚦咕：八對（成型 16 張，唔跟五組一對） */
+/**
+ * 嚦咕嚦咕（尼古尼古）：成型 17 張＝七對＋一刻（唔跟五組一對）。
+ * 四張相同可當兩對（唔好暗槓）。
+ */
 export function isLiguligu(hand: TileId[], winTile: TileId): boolean {
   const tiles = [...hand, winTile]
-  if (tiles.length !== 16) return false
+  if (tiles.length !== 17) return false
   const counts = countTiles(tiles)
-  if ([...counts.values()].some((n) => n !== 2)) return false
-  return counts.size === 8
+  let pairs = 0
+  let triples = 0
+  for (const n of counts.values()) {
+    if (n === 1 || n > 4) return false
+    if (n === 2) pairs += 1
+    else if (n === 3) triples += 1
+    else if (n === 4) pairs += 2
+  }
+  return triples === 1 && pairs === 7
 }
 
 /** 十三么：十三種么九字齊；成型 17 張（16+食／摸）全么九字 */
@@ -211,15 +224,38 @@ export function isDuiPengWait(
   )
 }
 
-/** 獨獨（單騎）：糊牌用來湊眼，食前手上冇呢隻 */
+/**
+ * 獨獨：單面聽（聽口得一張）——單騎／邊張／中洞。
+ * 對碰另計；多面聽而似獨聽型式 → 假獨。
+ */
 export function isDuduWait(
   hand: TileId[],
   melds: Meld[],
   winTile: TileId,
 ): boolean {
-  if (hand.filter((t) => t === winTile).length !== 0) return false
+  const waits = waitingTiles(hand, melds)
+  if (waits.length !== 1 || waits[0] !== winTile) return false
+  if (isDuiPengWait(hand, melds, winTile)) return false
+
   const parts = findStandardWins(hand, melds, winTile)
-  return parts.some((p) => p.pair === winTile)
+  const wr = isSuitTile(winTile) ? parseTile(winTile).rank : -1
+  return parts.some((p) => {
+    // 單騎：糊牌做眼
+    if (p.pair === winTile) return true
+    if (!isSuitTile(winTile)) return false
+    for (const m of p.melds) {
+      if (m.kind !== 'chi' || !m.tiles.includes(winTile)) continue
+      const ranks = m.tiles
+        .map((t) => parseTile(t).rank)
+        .sort((a, b) => a - b)
+      // 中洞
+      if (wr === ranks[1]) return true
+      // 邊張：123 糊 3，或 789 糊 7
+      if (ranks[0] === 1 && ranks[2] === 3 && wr === 3) return true
+      if (ranks[0] === 7 && ranks[2] === 9 && wr === 7) return true
+    }
+    return false
+  })
 }
 
 export function isAllChiPartition(p: WinPartition, exposed: Meld[]): boolean {

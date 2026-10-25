@@ -1,0 +1,50 @@
+萬、筒、索、風、三元、牌面（Front）、牌背（Back）
+  紅背在 ivory/，黑牌在 black/。同一套圖。
+  FluffyStuff/riichi-mahjong-tiles
+  CC0 1.0（公有領域）
+  https://github.com/FluffyStuff/riichi-mahjong-tiles
+
+骨牌牌面同牌背（bone/）
+  本專案自製，跟紅背牌面圖一齊用。
+
+港式牌面（hk/）
+  samoheen/mahjong-tiles，Hong Kong 一套
+  CC0 1.0（公有領域）
+  https://github.com/samoheen/mahjong-tiles
+  黑框白紙牌面同橙牌背由本專案配上。
+
+台式牌面（taiwan/）
+  samoheen/mahjong-tiles，Taiwan 一套
+  CC0 1.0（公有領域）
+  https://github.com/samoheen/mahjong-tiles
+  牌框／牌背沿用本專案 hk Front／Back。
+
+馬來牌面（malaysia/）
+  samoheen/mahjong-tiles，Malaysia 一套
+  CC0 1.0（公有領域）
+  https://github.com/samoheen/mahjong-tiles
+  牌框／牌背沿用本專案 hk Front／Back。
+
+越南牌面（vietnam/）
+  samoheen/mahjong-tiles，Vietnam 一套
+  CC0 1.0（公有領域）
+  https://github.com/samoheen/mahjong-tiles
+  一筒用 variant-1；牌框／牌背沿用本專案 hk Front／Back。
+
+主題框背（emerald／navy／gold／cinnabar／frost／jade／ink／dusk／sakura／cobalt／lacquer）
+  本專案自製 Front／Back SVG；牌面複用 ivory／hk／black（授權見上）。
+
+立體牌（relief/，斜視）
+  Wikimedia Commons 用戶 Cangjie6
+  CC BY-SA 4.0
+  https://creativecommons.org/licenses/by-sa/4.0/
+  原檔 MJw、MJt、MJs、MJd、MJf 系列（檔名帶 -.svg）
+  未改圖。牌背由本專案配上。
+
+花牌（春夏秋冬、梅蘭菊竹）
+  Wikimedia Commons 用戶 Cangjie6
+  CC BY-SA 4.0
+  https://creativecommons.org/licenses/by-sa/4.0/
+  原檔：MJh1-.svg 至 MJh8-.svg
+  https://commons.wikimedia.org/wiki/Special:Contributions/Cangjie6
+  未改圖。竹（MJh8）用站方 250px 縮圖，因為原檔下載被限流。

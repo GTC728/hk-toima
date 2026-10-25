@@ -1,0 +1,282 @@
+/* Learn / Puzzles — Chess.com 式目錄＋播放器，跟 shell */
+
+.learn-hub,
+.learn-lesson,
+.puzzle-play {
+  width: min(100%, var(--page-col-wide, 52rem));
+  max-width: var(--page-col-wide, 52rem);
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 2.5rem;
+  box-sizing: border-box;
+  color: var(--shell-text);
+}
+
+.learn-hub__header {
+  margin-bottom: 1.25rem;
+}
+
+.learn-hub__lead {
+  margin: 0.55rem 0 0;
+  max-width: 36rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--shell-muted);
+}
+
+.learn-hub__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.learn-hub__quick .shell-btn--primary {
+  width: auto;
+  letter-spacing: 0.04em;
+  font-size: 0.88rem;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.9rem;
+}
+
+.learn-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.learn-hub__section-head {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0.15rem;
+}
+
+.learn-hub__section-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--shell-muted);
+}
+
+.learn-hub__section-lead {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--shell-muted);
+}
+
+.learn-hub__section-actions {
+  margin-top: 0.55rem;
+}
+
+.learn-hub__section-actions .shell-btn {
+  width: auto;
+}
+
+.learn-hub__grid--master {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--shell-line);
+}
+
+.learn-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem 1.1rem;
+  border: 1px solid var(--shell-line);
+  border-radius: 12px;
+  background: var(--shell-panel);
+  color: var(--shell-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  min-height: 9.5rem;
+}
+
+.learn-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--shell-panel));
+}
+
+.learn-card__level {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.learn-card__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.learn-card__blurb {
+  flex: 1;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--shell-muted);
+}
+
+.learn-card__meta {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--shell-muted);
+}
+
+.learn-lesson__card {
+  padding: 1.15rem 1.2rem 1.35rem;
+  border-radius: 12px;
+  background: var(--shell-panel);
+  border: 1px solid var(--shell-line);
+}
+
+.learn-lesson__card h2 {
+  margin: 0.55rem 0 0.45rem;
+  font-size: 1.35rem;
+}
+
+.learn-lesson__card p {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--shell-muted);
+}
+
+.learn-lesson__dots {
+  display: flex;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.learn-lesson__dots li {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--shell-elevated);
+}
+
+.learn-lesson__dots li.is-done {
+  background: color-mix(in srgb, var(--accent) 55%, var(--shell-elevated));
+}
+
+.learn-lesson__dots li.is-active {
+  background: var(--accent);
+}
+
+.learn-lesson__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  padding: 0.65rem;
+  border-radius: 8px;
+  background: var(--shell-card);
+  border: 1px solid var(--shell-line);
+}
+
+.learn-lesson__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+}
+
+.learn-lesson__nav-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+.learn-lesson__nav-end .shell-btn {
+  width: auto;
+}
+
+.learn-lesson__nav .shell-btn--primary {
+  width: auto;
+  min-width: 8rem;
+  letter-spacing: 0.06em;
+}
+
+.puzzle-play__focus {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: var(--shell-panel);
+  border: 1px solid var(--shell-line);
+  font-weight: 700;
+  color: var(--shell-muted);
+}
+
+.puzzle-play__hand h2 {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  color: var(--shell-muted);
+}
+
+.puzzle-play__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--felt);
+  border: 1px solid var(--shell-line);
+}
+
+.puzzle-play__hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  color: var(--shell-muted);
+}
+
+.puzzle-play__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.puzzle-play__result {
+  margin-top: 1.15rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--shell-line);
+  background: var(--shell-panel);
+}
+
+.puzzle-play__result.is-ok {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--shell-panel));
+}
+
+.puzzle-play__result.is-bad {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--shell-panel));
+}
+
+.puzzle-play__result strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 1.05rem;
+}
+
+.puzzle-play__result p {
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+  color: var(--shell-muted);
+}
+
+.puzzle-play__result .shell-btn {
+  width: auto;
+}

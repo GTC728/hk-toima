@@ -37,39 +37,57 @@ describe('win-check', () => {
     expect(canWin(readyPair, [], 'wind-east')).toBe(true)
   })
 
-  it('detects 嚦咕嚦咕 (8 pairs)', () => {
-    const hand: TileId[] = [
+  it('rejects standard win when hand+win ≠ 剩餘面子×3＋2', () => {
+    // 清一色樣但少一對（15+1＝16），唔當標準糊
+    const short: TileId[] = [
+      'man-1', 'man-1',
+      'man-2', 'man-2',
+      'man-3',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7', 'man-7',
+      'man-8', 'man-8',
+    ]
+    expect(short).toHaveLength(15)
+    expect(findStandardWins(short, [], 'man-1')).toHaveLength(0)
+    expect(canWin(short, [], 'man-1')).toBe(false)
+
+    // 多一張（17+1）
+    const long: TileId[] = [...short, 'man-3', 'man-9']
+    expect(long).toHaveLength(17)
+    expect(findStandardWins(long, [], 'man-1')).toHaveLength(0)
+  })
+
+  it('detects 嚦咕嚦咕（七對＋一刻＝17 張）', () => {
+    // 八對聽：16 張全對，食其中一隻成一刻
+    const eightPairs: TileId[] = [
       'man-1', 'man-1',
       'man-2', 'man-2',
       'man-3', 'man-3',
-      'pin-1', 'pin-1',
-      'pin-5', 'pin-5',
-      'sou-9', 'sou-9',
-      'wind-east', 'wind-east',
-      'dragon-zhong', 'dragon-fa',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7', 'man-7',
+      'man-8', 'man-8',
     ]
-    expect(hand).toHaveLength(16)
-    expect(isLiguligu(hand, 'dragon-zhong')).toBe(false) // would be 9 pairs / broken
-    // 15 + win = 8 pairs
-    const h15: TileId[] = [
-      'man-1', 'man-1',
-      'man-2', 'man-2',
+    expect(eightPairs).toHaveLength(16)
+    expect(isLiguligu(eightPairs, 'man-1')).toBe(true)
+    expect(canWin(eightPairs, [], 'man-1')).toBe(true)
+    expect(isLiguligu(eightPairs, 'man-9')).toBe(false)
+
+    // 四張當兩對
+    const withQuad: TileId[] = [
+      'man-1', 'man-1', 'man-1',
+      'man-2', 'man-2', 'man-2', 'man-2',
       'man-3', 'man-3',
-      'pin-1', 'pin-1',
-      'pin-5', 'pin-5',
-      'sou-9', 'sou-9',
-      'wind-east', 'wind-east',
-      'dragon-zhong',
+      'man-4', 'man-4',
+      'man-5', 'man-5',
+      'man-6', 'man-6',
+      'man-7',
     ]
-    // 嚦咕：贏牌後 16 張八對 → 叫糊時 15 張？ 八對=16，叫糊爭一對嘅一張 → 15 張
-    // 但台牌平時捧 16 張… 嚦咕叫糊時手牌 15？定 16？
-    // 標準：未摸 16，八對贏完 16（摸／食入第 16 張成對）→ 叫糊 15 張。
-    // 引擎：手牌張數喺未摸時為 16；特殊牌型用 hand+winTile 長度。
-    // 對八對：hand 15 + win = 16。遊戲入面叮／叫糊時可能手牌 16（多一張要打）—
-    // 簡化：isLiguligu(hand, win) 要求 hand+win = 16 同八對。
-    expect(h15).toHaveLength(15)
-    expect(isLiguligu(h15, 'dragon-zhong')).toBe(true)
-    expect(canWin(h15, [], 'dragon-zhong')).toBe(true)
+    expect(withQuad).toHaveLength(16)
+    expect(isLiguligu(withQuad, 'man-7')).toBe(true)
   })
 
   it('detects 十三么', () => {

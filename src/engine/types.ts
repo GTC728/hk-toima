@@ -56,12 +56,7 @@ export interface PlayerState {
   cash: number
 }
 
-export type Phase =
-  | 'playing'
-  | 'claim_window'
-  | 'round_over'
-  | 'wall_exhausted'
-  | 'match_over'
+export type Phase = 'playing' | 'claim_window' | 'round_over' | 'match_over'
 
 export type ClaimKind = 'win' | 'kong' | 'pong' | 'chi' | 'pass'
 
@@ -92,7 +87,7 @@ export interface TableRules {
   maxLaKou: number
   /** 五同順番數（常見 40） */
   fiveTongShunFan: number
-  /** 計五同順後唔再計般高／相逢 */
+  /** true＝計四五同順後唔再計般高／相逢（舊坊間）；預設 false 仍另計 */
   excludeBanGaoXiangFengAfterWuTong: boolean
   /** 出牌限時（秒） */
   turnTimeoutSec: number
@@ -104,14 +99,14 @@ export interface TableRules {
 
 /**
  * 預設枱規＝坊間眾數番表（見 fans.json／design/fan-survey.md）。
- * 底 5 番；一番 $2 → 一個底等值 $10；五同順 40、計後唔再計般高／相逢。
+ * 底 5 番；一番 $2 → 一個底等值 $10；五同順 40；同順後仍計般高／相逢。
  */
 export const DEFAULT_RULES: TableRules = {
   base: 5,
   fanValue: 2,
   maxLaKou: 3,
   fiveTongShunFan: 40,
-  excludeBanGaoXiangFengAfterWuTong: true,
+  excludeBanGaoXiangFengAfterWuTong: false,
   turnTimeoutSec: 20,
   claimTimeoutSec: 12,
   matchCircles: 4,
@@ -211,7 +206,14 @@ export interface GameState {
   laLedger: LaEntry[]
   lastResult: RoundResult | null
   /** 即時賞罰紀錄（唔入拉） */
-  instantPayouts: { from: Seat; to: Seat; amount: number; reason: string }[]
+  instantPayouts: {
+    from: Seat
+    to: Seat
+    amount: number
+    reason: string
+    /** 即時賞罰 vs 拉帳結清。舊牌局可以冇呢個欄。 */
+    kind?: 'instant' | 'la_settle'
+  }[]
   history: string[]
   actionLog: ActionLogEntry[]
 }
@@ -219,14 +221,21 @@ export interface GameState {
 export type Action =
   | { type: 'start' }
   | { type: 'discard'; tile: TileId; declareDing?: boolean }
-  | { type: 'draw' }
-  | { type: 'chi'; tiles: TileId[] }
-  | { type: 'pong' }
-  | { type: 'mingkong' }
+  /** tile／kind 牌譜顯示用；重放時引擎可忽略（牆已決定） */
+  | { type: 'draw'; tile?: TileId; kind?: 'live' | 'flower' | 'kong' }
+  | { type: 'chi'; tiles: TileId[]; claimTile?: TileId; from?: Seat }
+  | { type: 'pong'; claimTile?: TileId; from?: Seat }
+  | { type: 'mingkong'; claimTile?: TileId; from?: Seat }
   | { type: 'ankong'; tile: TileId }
   | { type: 'jiagang'; tile: TileId }
-  | { type: 'win' }
-  | { type: 'pass' }
+  | {
+      type: 'win'
+      winTile?: TileId
+      winType?: 'tsumo' | 'ron' | 'chankan'
+      from?: Seat
+    }
+  /** forced：唔記過碰／過水。reason：auto=系統跳過（唔入操作 log）；timeout=時限到 */
+  | { type: 'pass'; forced?: boolean; reason?: 'auto' | 'timeout' }
   | { type: 'declareDing' }
   | { type: 'chopLa'; creditor: Seat; debtor: Seat }
   | { type: 'settleAll' }
@@ -282,4 +291,6 @@ export interface PrivateGameView extends PublicGameView {
   hand: TileId[]
   justDrawn: TileId | null
   legalActions: Action[]
+  /** 自己過碰的牌，只用於排牌，唔會傳去其他座位 */
+  passedPong: TileId[]
 }

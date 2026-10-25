@@ -12,13 +12,25 @@ import {
   suitOf,
 } from './tiles'
 import type { WinPartition } from './win-check'
-import { waitingTiles } from './win-check'
+import {
+  findStandardWins,
+  isDuiPengWait,
+  isSixteenBuDa,
+  waitingTiles,
+} from './win-check'
 import { getFanMeta } from './fan-catalog'
+
+/** 雙食時標明番種屬邊一舖；單舖食糊唔設 */
+export type FanShop = 'liguligu' | 'standard'
 
 export interface FanHit {
   id: string
   name: string
   value: number
+  /** 雙食分舖；結算／計番機分組同高亮用 */
+  shop?: FanShop
+  /** 同一番種多條時分辨（如混滿庭芳·7 vs ·8） */
+  instance?: string
 }
 
 export type ChiInfo = {
@@ -92,6 +104,10 @@ function chiInfo(tiles: TileId[], concealed: boolean): ChiInfo | null {
 export function collectPongs(
   partition: WinPartition | null,
   melds: Meld[],
+  opts?: {
+    winTile?: TileId
+    winType?: 'tsumo' | 'ron' | 'chankan'
+  },
 ): PongInfo[] {
   const out: PongInfo[] = []
   for (const m of melds) {
@@ -119,11 +135,16 @@ export function collectPongs(
       if (m.kind !== 'pong') continue
       const id = m.tiles[0]!
       const t = parseTile(id)
+      // 出銃／搶槓湊刻＝明刻；自摸湊刻先算暗
+      const fromOpenWin =
+        opts?.winType !== 'tsumo' &&
+        opts?.winTile != null &&
+        id === opts.winTile
       out.push({
         id,
         suit: t.suit,
         rank: t.rank,
-        concealed: true,
+        concealed: !fromOpenWin,
         isKong: false,
         isAnKong: false,
       })
@@ -143,30 +164,44 @@ export function isJiangYan(pair: TileId): boolean {
   return r === 2 || r === 5 || r === 8
 }
 
-/** 假獨：邊張或嵌張（單聽且唔係對碰／單騎） */
+/**
+ * 假獨：以邊張、中洞、獨聽嘅型式聽牌，但事實聽口多過一張。
+ * @see https://hktwmjtgt.com/ （胡牌型式類）
+ */
 export function isJiaDu(
   hand: TileId[],
   melds: Meld[],
   winTile: TileId,
 ): boolean {
   const waits = waitingTiles(hand, melds)
-  if (waits.length !== 1 || waits[0] !== winTile) return false
-  if (!isSuitTile(winTile)) return false
-  const n = hand.filter((t) => t === winTile).length
-  if (n === 2 || n === 0) return false // 對碰／獨獨
-  // 嵌張：手上有 win±1
-  const t = parseTile(winTile)
-  const lo = `${t.suit}-${t.rank - 1}` as TileId
-  const hi = `${t.suit}-${t.rank + 1}` as TileId
-  const hasLo = hand.includes(lo)
-  const hasHi = hand.includes(hi)
-  if (hasLo && hasHi) return true // 嵌張
-  // 邊張 12 聽 3 或 89 聽 7
-  if (t.rank === 3 && hand.includes(`${t.suit}-1` as TileId) && hand.includes(`${t.suit}-2` as TileId))
-    return true
-  if (t.rank === 7 && hand.includes(`${t.suit}-8` as TileId) && hand.includes(`${t.suit}-9` as TileId))
-    return true
-  return false
+  if (waits.length < 2 || !waits.includes(winTile)) return false
+  // 對碰另計
+  if (isDuiPengWait(hand, melds, winTile)) return false
+  if (!isSuitTile(winTile) && !isHonor(winTile)) return false
+
+  // 十六不搭：多面聽＋獨釣眼（糊牌湊成唯一對）
+  if (melds.length === 0 && isSixteenBuDa(hand, winTile)) {
+    return hand.filter((t) => t === winTile).length === 1
+  }
+
+  const wr = isSuitTile(winTile) ? parseTile(winTile).rank : -1
+  return findStandardWins(hand, melds, winTile).some((p) => {
+    // 獨聽型式：糊牌做眼
+    if (p.pair === winTile) return true
+    if (!isSuitTile(winTile)) return false
+    for (const m of p.melds) {
+      if (m.kind !== 'chi' || !m.tiles.includes(winTile)) continue
+      const ranks = m.tiles
+        .map((t) => parseTile(t).rank)
+        .sort((a, b) => a - b)
+      // 中洞：糊係順中間
+      if (wr === ranks[1]) return true
+      // 邊張：123 糊 3，或 789 糊 7
+      if (ranks[0] === 1 && ranks[2] === 3 && wr === 3) return true
+      if (ranks[0] === 7 && ranks[2] === 9 && wr === 7) return true
+    }
+    return false
+  })
 }
 
 export function isQiuren(melds: Meld[], handLen: number): boolean {
@@ -237,32 +272,67 @@ export function scoreYaoJiu(
   if (onlySuits && nums.every((r) => r < 5)) out.push(hit('xiaoyuwu'))
   if (onlySuits && nums.every((r) => r > 5)) out.push(hit('dayuwu'))
 
-  // 全帶 X：所有面子／眼都帶同一個數 X（2–8）
-  for (let x = 2; x <= 8; x++) {
-    const ok = groups.every((g) =>
-      g.some((t) => isSuitTile(t) && parseTile(t).rank === x),
-    )
-    if (ok) {
-      out.push(hit('quandaix'))
-      break
+  // 滿庭芳（全帶 X）：無字；每組都帶同一數 X（2–8）；只計一檔 60
+  {
+    const digits = mantingfangDigits(groups, 'pure')
+    if (digits.length === 1) {
+      const h = hit('mantingfang')
+      h.name = `滿庭芳·${digits[0]}`
+      h.instance = String(digits[0])
+      out.push(h)
     }
   }
 
-  // 混帶 XYZ：帶某數 X，另可複合 — 簡化：有字＋所有組帶同一 X
-  if (hasHonor) {
+  // 混滿庭芳：有字；每組＝字 或 帶數 X；每個 X 各自一條 15（方便分開高亮）
+  {
+    const digits = mantingfangDigits(groups, 'hun')
+    const unit = getFanMeta('hunmantingfang').value
+    for (const d of digits) {
+      const h = hit('hunmantingfang', unit)
+      h.name = `混滿庭芳·${d}`
+      h.instance = String(d)
+      out.push(h)
+    }
+  }
+
+  return out
+}
+
+/** 滿庭芳／混滿庭芳：合資格帶數（2–8） */
+export function mantingfangDigits(
+  groups: TileId[][],
+  mode: 'pure' | 'hun',
+): number[] {
+  if (groups.length < 6) return []
+  const hasHonor = groups.some((g) => g.some(isHonor))
+  if (mode === 'pure') {
+    if (hasHonor) return []
     for (let x = 2; x <= 8; x++) {
-      const ok = groups.every(
-        (g) =>
-          g.some(isHonor) ||
+      if (
+        groups.every((g) =>
           g.some((t) => isSuitTile(t) && parseTile(t).rank === x),
-      )
-      if (ok && groups.some((g) => g.some(isHonor))) {
-        out.push(hit('hundaixyz'))
-        break
+        )
+      ) {
+        return [x]
       }
     }
+    return []
   }
-
+  if (!hasHonor) return []
+  // 至少一組數牌帶 X；唔好全字牌時空虛通過（字一色 ≠ 混滿庭芳）
+  const out: number[] = []
+  for (let x = 2; x <= 8; x++) {
+    const hasDigitGroup = groups.some((g) =>
+      g.some((t) => isSuitTile(t) && parseTile(t).rank === x),
+    )
+    if (!hasDigitGroup) continue
+    const ok = groups.every(
+      (g) =>
+        g.some(isHonor) ||
+        g.some((t) => isSuitTile(t) && parseTile(t).rank === x),
+    )
+    if (ok) out.push(x)
+  }
   return out
 }
 
@@ -359,7 +429,9 @@ export function scoreAnKeGang(
   hit: (id: string, o?: number) => FanHit,
 ): FanHit[] {
   const out: FanHit[] = []
-  const anKe = pongs.filter((p) => p.concealed).length
+  // 偏高檔（麻雀撚）：暗刻＋任何槓都計入「暗坎」數（四暗坎等）
+  // 明碰唔計；暗碰／自摸刻、明槓／暗槓／加槓都計
+  const anKe = pongs.filter((p) => p.concealed || p.isKong).length
   if (anKe >= 5) out.push(hit('wuanake'))
   else if (anKe === 4) out.push(hit('sianke'))
   else if (anKe === 3) out.push(hit('sananke'))
@@ -466,66 +538,100 @@ export function scoreBanGaoXiangFeng(
     arr.push(c)
     byKey.set(c.key, arr)
   }
-  const sameSuitPairs: { n: number; dark: boolean }[] = []
-  for (const arr of byKey.values()) {
+  const sameSuitPairs: {
+    n: number
+    dark: boolean
+    key: string
+    sample: ChiInfo
+  }[] = []
+  for (const [key, arr] of byKey) {
     if (arr.length >= 2) {
       sameSuitPairs.push({
         n: arr.length,
         dark: arr.every((x) => x.concealed),
+        key,
+        sample: arr[0]!,
       })
     }
   }
   sameSuitPairs.sort((a, b) => b.n - a.n)
 
-  // 一色四／三同順優先
+  // 一色四／三同順優先（三／四組同一順）
   const top = sameSuitPairs[0]
   if (top && top.n >= 4) {
     out.push(hit(top.dark ? 'anyisesitong' : 'mingyisesitong'))
   } else if (top && top.n === 3) {
     out.push(hit(top.dark ? 'anyisesantong' : 'mingyisesantong'))
-  } else if (sameSuitPairs.length >= 2 && sameSuitPairs[0]!.n === 2 && sameSuitPairs[1]!.n === 2) {
-    // 真雙般高：兩組不同嘅般高
-    const dark = sameSuitPairs[0]!.dark && sameSuitPairs[1]!.dark
-    out.push(hit(dark ? 'anzhenshuangbangao' : 'mingzhenshuangbangao'))
-  } else if (top && top.n === 2 && sameSuitPairs.length === 1) {
-    // 小雙？單一般高
-    out.push(hit(top.dark ? 'anbangao' : 'mingbangao'))
-  } else if (top && top.n === 2 && sameSuitPairs.length > 1) {
-    // 小雙般高：一組般高 + 另一組有重
-    const dark = sameSuitPairs.every((p) => p.dark)
-    out.push(hit(dark ? 'anxiaoshuangbangao' : 'mingxiaoshuangbangao'))
+  } else {
+    // 每組般高分開一條（明5／暗10），方便高亮；唔再併「真雙／小雙」
+    for (const p of sameSuitPairs) {
+      if (p.n < 2) continue
+      const id = p.dark ? 'anbangao' : 'mingbangao'
+      const h = hit(id)
+      const suitLabel =
+        p.sample.suit === 'man' ? '萬' : p.sample.suit === 'pin' ? '筒' : '索'
+      h.name = `${p.dark ? '暗' : '明'}般高·${p.sample.ranks.join('')}${suitLabel}`
+      h.instance = p.key
+      out.push(h)
+    }
   }
 
-  // 相逢：同 rankKey 唔同門
+  /**
+   * 相逢：同一個數字順、唔同門。
+   * - 兩色＝相逢（有副露＝明 3）／暗相逢（全暗 5）
+   * - 三色＝明／暗三相逢
+   * 多組（唔同 rank）可並計：例如一組明相逢＋一組暗相逢。
+   * 唔再亂加「囍相逢」——喜相逢＝相逢別名，唔係兩組加 15。
+   */
   const byRank = new Map<string, ChiInfo[]>()
   for (const c of chis) {
     const arr = byRank.get(c.rankKey) ?? []
     arr.push(c)
     byRank.set(c.rankKey, arr)
   }
-  let bestXiang = 0
-  let bestXiangDark = true
+  // 同一 rank：先睇全部順（明＋暗）嘅門數；三色以上用整組（有明＝明三相逢）。
+  // 兩色先：暗子集夠兩色＝暗相逢（同門明順唔抹銷）；否則連明夠兩色＝明相逢。
+  const xiangGroups: { suits: number; dark: boolean }[] = []
   for (const arr of byRank.values()) {
-    const suits = new Set(arr.map((c) => c.suit))
-    if (suits.size >= 2) {
-      const n = suits.size
-      if (n > bestXiang) {
-        bestXiang = n
-        bestXiangDark = arr.every((c) => c.concealed)
-      }
+    const darkArr = arr.filter((c) => c.concealed)
+    const darkSuits = new Set(darkArr.map((c) => c.suit)).size
+    const allSuits = new Set(arr.map((c) => c.suit)).size
+    if (allSuits >= 3) {
+      xiangGroups.push({
+        suits: allSuits,
+        dark: arr.every((c) => c.concealed),
+      })
+    } else if (darkSuits >= 2) {
+      xiangGroups.push({ suits: darkSuits, dark: true })
+    } else if (allSuits >= 2) {
+      xiangGroups.push({ suits: allSuits, dark: false })
     }
   }
-  // 若已計四／五同順且 exclude，上面已 return
-  // 若已計一色三同順等，相逢仍可能；常見枱：同順優先，相逢用剩餘
-  if (bestXiang >= 5) {
-    out.push(hit(bestXiangDark ? 'anwuxiangfeng' : 'mingwuxiangfeng'))
-  } else if (bestXiang === 4) {
-    out.push(hit(bestXiangDark ? 'ansixiangfeng' : 'mingsixiangfeng'))
-  } else if (bestXiang === 3) {
-    out.push(hit(bestXiangDark ? 'ansanxiangfeng' : 'mingsanxiangfeng'))
-  } else if (bestXiang === 2 && !out.some((f) => f.id.includes('bangao') || f.id.includes('yise'))) {
-    out.push(hit('xiangfeng'))
+  xiangGroups.sort((a, b) => b.suits - a.suits)
+  // 偏高檔：般高同相逢可並計（影片常見）；四五同順先唔再拆相逢
+  const hasYiseTong = out.some(
+    (f) => f.id.includes('yisesantong') || f.id.includes('yisesitong'),
+  )
+  // 兩色相逢可多組並計（明3／暗5 累加）；三色及以上各 rank 一档
+  let xiangN = 0
+  let anXiangN = 0
+  for (const g of xiangGroups) {
+    if (g.suits >= 5) {
+      out.push(hit(g.dark ? 'anwuxiangfeng' : 'mingwuxiangfeng'))
+    } else if (g.suits === 4) {
+      out.push(hit(g.dark ? 'ansixiangfeng' : 'mingsixiangfeng'))
+    } else if (g.suits === 3) {
+      out.push(hit(g.dark ? 'ansanxiangfeng' : 'mingsanxiangfeng'))
+    } else if (g.suits === 2 && !hasYiseTong) {
+      if (g.dark) anXiangN += 1
+      else xiangN += 1
+    }
   }
+  if (xiangN > 0)
+    out.push(hit('xiangfeng', getFanMeta('xiangfeng').value * xiangN))
+  if (anXiangN > 0)
+    out.push(hit('anxiangfeng', getFanMeta('anxiangfeng').value * anXiangN))
+
 
   // 單色步步高：同門至少三組「起始連續」順（123+234+345），唔係清龍 123+456+789
   for (const suit of ['man', 'pin', 'sou'] as const) {

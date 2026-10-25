@@ -4,11 +4,17 @@ import {
   isSuitTile,
   parseTile,
   pickBestWinPartition,
+  type FanShop,
   type Meld,
   type TileId,
 } from '../engine'
-import { collectChis, collectPongs } from '../engine/fan-patterns'
+import {
+  collectChis,
+  collectPongs,
+  mantingfangDigits,
+} from '../engine/fan-patterns'
 import { countTiles } from '../engine/tiles'
+import { calcScoreHand } from './fanCalculatorModel'
 
 export type HighlightCounts = Map<TileId, number>
 
@@ -56,6 +62,9 @@ export function concealedForWin(
   return [...hand]
 }
 
+/** @deprecated 用 fanCalculatorModel；設糊唔再偷手牌 */
+export { calcTileCountLabel } from './fanCalculatorModel'
+
 /**
  * 同一番種累加幾次（用表定單位番除實際番）。
  * 例：明槓單位 2、實際 4 → 2次；連莊 value=0 唔顯示次數。
@@ -70,9 +79,16 @@ export function fanRepeatTimes(fanId: string, value: number): number {
   return n >= 2 ? n : 1
 }
 
+export function fanShopLabel(shop: FanShop | undefined): string | null {
+  if (shop === 'liguligu') return '第1舖 · 嚦咕'
+  if (shop === 'standard') return '第2舖 · 標準'
+  return null
+}
+
 /**
  * 撳番種 → 要高亮嘅牌（帶張數）。
  * 未知番唔再 fallback 亮糊牌（避免兩暗刻誤亮眼）。
+ * 雙食傳 shop：嚦咕舖唔用標準拆法（避免兩粒清一色亮成同一舖結構）。
  */
 export function tilesForFanHighlight(
   fanId: string,
@@ -84,29 +100,48 @@ export function tilesForFanHighlight(
     winType: 'tsumo' | 'ron' | 'chankan'
     /** 贏家門風正花；唔傳則正／爛花一齊亮所有花 */
     zhengHuaTiles?: TileId[]
+    /** 雙食：邊一舖嘅番 */
+    shop?: FanShop
+    /** 混／滿庭芳：只亮呢個帶數（分開兩條時用） */
+    instance?: string
   },
 ): HighlightCounts {
   const set = empty()
-  const concealed = concealedForWin(opts.hand, opts.winTile, opts.winType)
-  // 同計番：用最高番拆法，避免 parts[0] 亮錯坎
-  const partition = pickBestWinPartition({
-    hand: concealed,
-    melds: opts.melds,
-    flowers: opts.flowers,
+  // 計番機：手／糊分開用 calcScoreHand；牌局自摸手裡含水：拆唔成再 fallback concealedForWin
+  let scoreHand = calcScoreHand(opts.hand, opts.winTile, opts.winType)
+  const pick = (hand: TileId[]) =>
+    opts.shop === 'liguligu'
+      ? null
+      : pickBestWinPartition({
+          hand,
+          melds: opts.melds,
+          flowers: opts.flowers,
+          winTile: opts.winTile,
+          winType: opts.winType,
+          ding: null,
+          isDealer: false,
+          consecutiveWins: 0,
+          seat: 0,
+        })
+  let partition = pick(scoreHand)
+  if (!partition && opts.winType === 'tsumo') {
+    const fallback = concealedForWin(opts.hand, opts.winTile, 'tsumo')
+    const p2 = pick(fallback)
+    if (p2) {
+      scoreHand = fallback
+      partition = p2
+    }
+  }
+  const pongs = collectPongs(partition, opts.melds, {
     winTile: opts.winTile,
     winType: opts.winType,
-    ding: null,
-    isDealer: false,
-    consecutiveWins: 0,
-    seat: 0,
   })
-  const pongs = collectPongs(partition, opts.melds)
   const chis = collectChis(partition, opts.melds)
 
   const addPong = (id: TileId, kong: boolean) => add(set, id, kong ? 4 : 3)
 
   const allTiles = () => [
-    ...concealed,
+    ...scoreHand,
     opts.winTile,
     ...opts.melds.flatMap((m) => m.tiles),
   ]
@@ -122,8 +157,13 @@ export function tilesForFanHighlight(
     }
   }
 
-  /** 相逢：只亮計番嗰組「同數字、唔同門」順（最大門數；每門一坎） */
-  const addXiangFengChi = () => {
+  /**
+   * 相逢：只亮計番嗰組「同數字、唔同門」順。
+   * mode=dark → 只亮暗順（暗相逢／暗三相逢…）
+   * mode=open → 只亮「含明」嗰組（明相逢）；唔好亮純暗組
+   * mode=any → 唔限
+   */
+  const addXiangFengChi = (mode: 'any' | 'dark' | 'open' = 'any') => {
     const byRank = new Map<string, typeof chis>()
     for (const c of chis) {
       const arr = byRank.get(c.rankKey) ?? []
@@ -133,9 +173,25 @@ export function tilesForFanHighlight(
     let best: (typeof chis)[number][] | null = null
     let bestSuits = 0
     for (const arr of byRank.values()) {
+      const pool =
+        mode === 'dark'
+          ? arr.filter((c) => c.concealed)
+          : mode === 'open'
+            ? arr.every((c) => c.concealed)
+              ? []
+              : arr
+            : arr
       const bySuit = new Map<string, (typeof chis)[number]>()
-      for (const c of arr) {
-        if (!bySuit.has(c.suit)) bySuit.set(c.suit, c)
+      for (const c of pool) {
+        // 暗模式：同門優先留暗；明模式：同門優先留明
+        const prev = bySuit.get(c.suit)
+        if (!prev) {
+          bySuit.set(c.suit, c)
+        } else if (mode === 'open' && prev.concealed && !c.concealed) {
+          bySuit.set(c.suit, c)
+        } else if (mode === 'dark' && !prev.concealed && c.concealed) {
+          bySuit.set(c.suit, c)
+        }
       }
       if (bySuit.size >= 2 && bySuit.size > bestSuits) {
         bestSuits = bySuit.size
@@ -185,6 +241,7 @@ export function tilesForFanHighlight(
       break
 
     case 'zimo':
+    case 'dingmo':
     case 'qianggang':
     case 'duipeng':
     case 'dudu':
@@ -279,7 +336,6 @@ export function tilesForFanHighlight(
     case 'xiaosixi':
     case 'dasifeng':
     case 'xiaosifeng':
-    case 'fengke':
       for (const p of pongs) {
         if (p.suit === 'wind') addPong(p.id, p.isKong)
       }
@@ -288,11 +344,18 @@ export function tilesForFanHighlight(
       }
       break
 
+    case 'fengke':
+      // 風牌只計風刻／槓（正風／正圈），唔計風眼
+      for (const p of pongs) {
+        if (p.suit === 'wind') addPong(p.id, p.isKong)
+      }
+      break
+
     case 'lianganke':
     case 'sananke':
     case 'sianke':
     case 'wuanake':
-      for (const p of pongs.filter((x) => x.concealed)) {
+      for (const p of pongs.filter((x) => x.concealed || x.isKong)) {
         addPong(p.id, p.isKong)
       }
       break
@@ -378,12 +441,13 @@ export function tilesForFanHighlight(
     case 'mingzalong':
     case 'anzalong':
     case 'laoshao':
-    case 'bangao':
-    case 'mingbangao':
-    case 'anbangao':
     case 'tongshun':
     case 'wutongshun':
     case 'sitongshun':
+    case 'mingwutongshun':
+    case 'anwutongshun':
+    case 'mingsitongshun':
+    case 'ansitongshun':
     case 'mingdansebbg':
     case 'andansebbg':
     case 'mingsansebbg':
@@ -391,20 +455,89 @@ export function tilesForFanHighlight(
       addAllChi()
       break
 
+    case 'bangao':
+    case 'mingbangao':
+    case 'anbangao':
+    case 'mingzhenshuangbangao':
+    case 'anzhenshuangbangao':
+    case 'mingxiaoshuangbangao':
+    case 'anxiaoshuangbangao': {
+      // 有 instance（如 man:6-7-8）只亮嗰組般高；否則亮所有成對同門順
+      const wantKey = opts.instance
+      const byKey = new Map<string, typeof chis>()
+      for (const c of chis) {
+        const arr = byKey.get(c.key) ?? []
+        arr.push(c)
+        byKey.set(c.key, arr)
+      }
+      for (const [key, arr] of byKey) {
+        if (arr.length < 2) continue
+        if (wantKey && key !== wantKey) continue
+        for (const c of arr) {
+          for (const r of c.ranks) {
+            add(set, `${c.suit}-${r}` as TileId)
+          }
+        }
+      }
+      break
+    }
+
     case 'mingqinglong':
     case 'anqinglong':
       addQingLongChi()
       break
 
     case 'xiangfeng':
-    case 'mingsanxiangfeng':
-    case 'ansanxiangfeng':
-    case 'mingsixiangfeng':
-    case 'ansixiangfeng':
-    case 'mingwuxiangfeng':
-    case 'anwuxiangfeng':
-      addXiangFengChi()
+      addXiangFengChi('open')
       break
+    case 'anxiangfeng':
+      addXiangFengChi('dark')
+      break
+    case 'mingsanxiangfeng':
+    case 'mingsixiangfeng':
+    case 'mingwuxiangfeng':
+      addXiangFengChi('open')
+      break
+    case 'ansanxiangfeng':
+    case 'ansixiangfeng':
+    case 'anwuxiangfeng':
+      addXiangFengChi('dark')
+      break
+
+    case 'mantingfang':
+    case 'hunmantingfang':
+    case 'quandaix':
+    case 'hundaixyz': {
+      // 按組高亮：字組全亮；數組只亮帶數 X（明／手／糊一視同仁）
+      const groups: TileId[][] = partition
+        ? [
+            ...opts.melds.map((m) => m.tiles),
+            ...partition.melds.map((m) => m.tiles),
+            [partition.pair, partition.pair],
+          ]
+        : opts.melds.map((m) => m.tiles)
+      const hun =
+        fanId === 'hunmantingfang' || fanId === 'hundaixyz'
+      let digits = mantingfangDigits(groups, hun ? 'hun' : 'pure')
+      if (opts.instance) {
+        const only = Number(opts.instance)
+        digits = digits.filter((d) => d === only)
+      }
+      if (digits.length === 0) break
+      for (const g of groups) {
+        const honorGroup = g.some(isHonor)
+        if (hun && honorGroup) {
+          addAll(set, g)
+          continue
+        }
+        for (const x of digits) {
+          for (const t of g) {
+            if (isSuitTile(t) && parseTile(t).rank === x) add(set, t)
+          }
+        }
+      }
+      break
+    }
 
     case 'erjiemei':
     case 'sanjiemei':
@@ -457,6 +590,10 @@ export function tilesForFanHighlight(
       add(set, opts.winTile)
       break
 
+    case 'liguligu':
+      addAll(set, allTiles())
+      break
+
     case 'shisanyao': {
       for (const t of [...concealed, opts.winTile]) {
         if (isHonor(t)) add(set, t)
@@ -502,17 +639,23 @@ export function selectionFlags(
 }
 
 /**
- * 副露高亮：優先整坎匹配（避免碰／刻吞咗相逢順嘅牌而亮錯坎）。
+ * 副露高亮：
+ * 1) 優先整坎匹配（相逢等：避免碰吞咗順嘅牌）
+ * 2) 其餘逐張 take（混滿庭芳只亮帶數：678 明順只亮嗰隻 8）
+ * skipChi：暗相逢等——明順同暗順共用牌 id，副露先扣會搶光，故跳過上牌
  * 回傳 [meldFlags, 剩餘 counts 畀手牌／花繼續 take]。
  */
 export function assignMeldHighlightFlags(
   melds: Meld[],
   counts: HighlightCounts,
+  opts?: { skipChi?: boolean },
 ): { meldFlags: boolean[][]; left: HighlightCounts } {
   const left = new Map(counts)
   const meldFlags = melds.map((m) => m.tiles.map(() => false))
+  const whollyLit = new Set<number>()
   for (let i = 0; i < melds.length; i++) {
     const m = melds[i]!
+    if (opts?.skipChi && m.kind === 'chi') continue
     const need = countTiles(m.tiles)
     const fits = [...need].every(([t, n]) => (left.get(t) ?? 0) >= n)
     if (!fits) continue
@@ -525,6 +668,31 @@ export function assignMeldHighlightFlags(
       left.set(t, (left.get(t) ?? 0) - n)
     }
     meldFlags[i] = m.tiles.map(() => true)
+    whollyLit.add(i)
+  }
+  // 第二輪：未整坎亮嘅副露，逐張扣額度（帶數只亮部分）
+  for (let i = 0; i < melds.length; i++) {
+    if (whollyLit.has(i)) continue
+    const m = melds[i]!
+    if (opts?.skipChi && m.kind === 'chi') continue
+    meldFlags[i] = m.tiles.map((t) => {
+      const n = left.get(t) ?? 0
+      if (n > 0) {
+        left.set(t, n - 1)
+        return true
+      }
+      return false
+    })
   }
   return { meldFlags, left }
+}
+
+/** 暗相逢類：高亮唔好落到明順 */
+export function fanHighlightSkipsChiMelds(fanId: string): boolean {
+  return (
+    fanId === 'anxiangfeng' ||
+    fanId === 'ansanxiangfeng' ||
+    fanId === 'ansixiangfeng' ||
+    fanId === 'anwuxiangfeng'
+  )
 }

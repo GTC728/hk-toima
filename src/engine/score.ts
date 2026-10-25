@@ -119,7 +119,8 @@ export function buildWinResult(input: BuildWinInput): WinResult {
   } else {
     const from = input.discarder!
     let fan = handFan
-    if (winnerIsDealer) {
+    // 贏家係莊，或莊家出銃：付款含莊／連莊，番表要一齊寫，否則結算會番數同銀碼對唔上。
+    if (winnerIsDealer || from === input.dealer) {
       fan += dExtra
       if (input.consecutiveWins > 0) {
         fans.push({
@@ -130,10 +131,10 @@ export function buildWinResult(input: BuildWinInput): WinResult {
       } else {
         fans.push({ id: 'dealer', name: '莊', value: 1 })
       }
-    } else if (from === input.dealer) {
-      fan += dExtra
     }
-    const amount = amountFromFan(input.rules, fan)
+    // 反雪：一炮多響時，出銃者相關番×2（番表）。銀碼＝番×番值，所以付款倍計。
+    const payFan = input.fanxue ? fan * 2 : fan
+    const amount = amountFromFan(input.rules, payFan)
     payments.push({ from, to: input.seat, amount })
     paymentPerPayer = amount
   }
@@ -153,10 +154,10 @@ export function buildWinResult(input: BuildWinInput): WinResult {
   }
 }
 
-/** 底5 + 平胡5 + 無字2 + 自摸1 = 13 番 × $1 = $13 */
+/** 底5 + 平胡5 + 無字1 + 自摸1 = 12 番 × $1 = $12（偏高檔） */
 export function examplePinghuWuziZimo(
   rules: TableRules = { ...DEFAULT_RULES, base: 5, fanValue: 1 },
 ): number {
-  const fan = rules.base + 5 + 2 + 1
+  const fan = rules.base + 5 + 1 + 1
   return amountFromFan(rules, fan)
 }

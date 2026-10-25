@@ -1,5 +1,6 @@
-import { discardKeepScore, visibleTileCounts } from './ai'
-import { getLegalActions } from './game'
+/** 練習提示跟未加權棄牌分，唔跟 AI 性格。 */
+import { chooseDiscardTile } from './ai'
+import { getLegalActions } from './legal-actions'
 import type { Action, GameState, Meld, Seat, TileId } from './types'
 import { waitingTiles } from './win-check'
 
@@ -17,23 +18,11 @@ export function hintDiscard(state: GameState, seat: Seat): TileId | null {
     (a): a is Extract<Action, { type: 'discard' }> => a.type === 'discard',
   )
   if (discards.length === 0) return null
-
-  const hand = state.players[seat].hand
-  const visible = visibleTileCounts(state, seat)
-
-  let best = discards[0]!
-  let bestScore = Infinity
-  for (const action of discards) {
-    const score = discardKeepScore(action.tile, hand, visible)
-    if (
-      score < bestScore ||
-      (score === bestScore && action.tile.localeCompare(best.tile) < 0)
-    ) {
-      bestScore = score
-      best = action
-    }
-  }
-  return best.tile
+  return chooseDiscardTile(
+    state,
+    seat,
+    discards.map((a) => a.tile),
+  )
 }
 
 /**

@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
-import type { Seat, TileId } from '../engine'
-import { Tile } from './tiles'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatPly, type Seat, visiblePlies } from '../engine'
 import {
   buildReplayFrames,
   type ReplayFrame,
   type ReplaySource,
 } from './replaySource'
+import { ReplayTable } from './ReplayTable'
+import { bumpReplayView } from './stats-s10'
 
 export type { ReplaySource } from './replaySource'
 
@@ -25,16 +26,24 @@ const KEY_ACTION_TYPES = new Set([
 interface ReplayProps {
   source: ReplaySource
   names: string[]
+  /** 視角座位（放喺牌桌下方） */
+  you?: Seat
   onClose: () => void
 }
 
-export function Replay({ source, names, onClose }: ReplayProps) {
+export function Replay({ source, names, you = 0, onClose }: ReplayProps) {
   const frames = useMemo(
     () => buildReplayFrames(source, names),
     [source, names],
   )
   const [idx, setIdx] = useState(0)
   const [keyOnly, setKeyOnly] = useState(false)
+  const [views, setViews] = useState(0)
+  const plyListRef = useRef<HTMLUListElement>(null)
+
+  useEffect(() => {
+    setViews(bumpReplayView(source.seed))
+  }, [source.seed])
 
   const displayIndices = useMemo(() => {
     if (!keyOnly || frames.length === 0) {
@@ -70,6 +79,11 @@ export function Replay({ source, names, onClose }: ReplayProps) {
     Math.min(idx, Math.max(0, frames.length - 1))
   const frame: ReplayFrame | undefined = frames[safeIdx]
 
+  useEffect(() => {
+    const el = plyListRef.current?.querySelector(`[data-ply="${safeIdx}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [safeIdx])
+
   if (!frame) {
     return (
       <div className="replay" role="dialog" aria-label="重溫本局">
@@ -85,8 +99,8 @@ export function Replay({ source, names, onClose }: ReplayProps) {
 
   const atStart = safeDisplayPos <= 0
   const atEnd = safeDisplayPos >= displayIndices.length - 1
-  const last = safeIdx >= frames.length - 1
   const pub = frame.public
+  const plyRows = visiblePlies(source.actionLog)
 
   function goRelative(delta: number) {
     const nextPos = Math.min(
@@ -98,56 +112,62 @@ export function Replay({ source, names, onClose }: ReplayProps) {
 
   return (
     <div className="replay" role="dialog" aria-label="重溫本局">
-      <div className="replay__panel">
+      <div className="replay__panel replay__panel--table">
         <header className="replay__header">
-          <h2>重溫</h2>
+          <h2>重溫 · 牌譜</h2>
           <p>
             {keyOnly ? '關鍵 ' : '步驟 '}
             {safeDisplayPos + 1}／{displayIndices.length}
             {!keyOnly ? `（全 ${frames.length}）` : ''}
             {frame.note ? ` · ${frame.note}` : ''}
             {frame.seat != null ? ` · ${WIND[frame.seat]}` : ''}
+            {views > 0 ? ` · 本機重播 ${views} 次` : ''}
           </p>
         </header>
 
-        <div className="replay__table">
-          {pub.players.map((p) => (
-            <div key={p.seat} className="replay__seat">
-              <div className="replay__seat-head">
-                <strong>
-                  {WIND[p.seat as Seat]} · {names[p.seat] ?? p.name}
-                </strong>
-                <span>
-                  {p.isDealer ? '莊 · ' : ''}
-                  {last && frame.revealHands
-                    ? `${frame.revealHands[p.seat]?.length ?? 0} 張`
-                    : `手牌 ${p.handCount}`}
-                </span>
-              </div>
-              {last && frame.revealHands ? (
-                <div className="replay__hand">
-                  {(frame.revealHands[p.seat] as TileId[] | undefined)?.map(
-                    (t, i) => (
-                      <Tile key={`${t}-${i}`} id={t} size="sm" />
-                    ),
-                  )}
-                </div>
-              ) : (
-                <div className="replay__backs" aria-hidden>
-                  {Array.from({ length: Math.min(p.handCount, 16) }, (_, i) => (
-                    <span key={i} className="replay__back" />
-                  ))}
-                </div>
-              )}
-              {p.discards.length > 0 && (
-                <div className="replay__discards">
-                  {p.discards.slice(-8).map((t, i) => (
-                    <Tile key={`${t}-${i}`} id={t} size="sm" dimmed />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="replay__body replay__body--table">
+          <div className="replay__felt-wrap">
+            <ReplayTable frame={frame} names={names} you={you} />
+          </div>
+
+          <aside className="replay__plies" aria-label="記步">
+            <h3>記步</h3>
+            <ul className="replay__ply-list" ref={plyListRef}>
+              {frames.map((f, i) => {
+                if (keyOnly && !displayIndices.includes(i)) return null
+                const label =
+                  f.ply != null
+                    ? formatPly(f.ply, names).text
+                    : (f.note ?? f.actionType)
+                const who =
+                  f.ply != null
+                    ? formatPly(f.ply, names).who
+                    : f.seat != null
+                      ? `${WIND[f.seat]}`
+                      : '檯'
+                return (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      data-ply={i}
+                      className={
+                        i === safeIdx
+                          ? 'replay__ply is-on'
+                          : 'replay__ply'
+                      }
+                      onClick={() => setIdx(i)}
+                    >
+                      <span>{who}</span>
+                      <em>{label}</em>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            {plyRows.length === 0 && (
+              <p className="replay__meta">未有記步</p>
+            )}
+          </aside>
         </div>
 
         <p className="replay__meta">
@@ -160,6 +180,14 @@ export function Replay({ source, names, onClose }: ReplayProps) {
         </p>
 
         <div className="replay__controls">
+          <button
+            type="button"
+            className="replay__btn"
+            disabled={atStart}
+            onClick={() => setIdx(displayIndices[0]!)}
+          >
+            開頭
+          </button>
           <button
             type="button"
             className="replay__btn"
@@ -192,7 +220,6 @@ export function Replay({ source, names, onClose }: ReplayProps) {
               setKeyOnly((k) => {
                 const next = !k
                 if (next) {
-                  // 切到關鍵模式時對齊到最近關鍵幀
                   const lastI = frames.length - 1
                   let best = 0
                   for (let i = 0; i < frames.length; i++) {

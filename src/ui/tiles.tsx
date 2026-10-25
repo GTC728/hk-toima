@@ -1,5 +1,65 @@
-import type { ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { parseTile, type Meld, type TileId } from '../engine'
+import { loadLongPressClear } from './leftoverPrefs'
+import {
+  getTileSkin,
+  getTileSkinOption,
+  subscribeTileSkin,
+  type TileSkinId,
+} from './tileSkin'
+
+/** 牌面圖：public/tiles。萬筒索風三元為 CC0；花牌為 CC BY-SA，見 CREDITS.txt */
+const TILE_FILE: Record<string, string> = {
+  'man-1': 'Man1.png',
+  'man-2': 'Man2.png',
+  'man-3': 'Man3.png',
+  'man-4': 'Man4.png',
+  'man-5': 'Man5.png',
+  'man-6': 'Man6.png',
+  'man-7': 'Man7.png',
+  'man-8': 'Man8.png',
+  'man-9': 'Man9.png',
+  'pin-1': 'Pin1.png',
+  'pin-2': 'Pin2.png',
+  'pin-3': 'Pin3.png',
+  'pin-4': 'Pin4.png',
+  'pin-5': 'Pin5.png',
+  'pin-6': 'Pin6.png',
+  'pin-7': 'Pin7.png',
+  'pin-8': 'Pin8.png',
+  'pin-9': 'Pin9.png',
+  'sou-1': 'Sou1.png',
+  'sou-2': 'Sou2.png',
+  'sou-3': 'Sou3.png',
+  'sou-4': 'Sou4.png',
+  'sou-5': 'Sou5.png',
+  'sou-6': 'Sou6.png',
+  'sou-7': 'Sou7.png',
+  'sou-8': 'Sou8.png',
+  'sou-9': 'Sou9.png',
+  'wind-east': 'Ton.png',
+  'wind-south': 'Nan.png',
+  'wind-west': 'Shaa.png',
+  'wind-north': 'Pei.png',
+  'dragon-zhong': 'Chun.png',
+  'dragon-fa': 'Hatsu.png',
+  'dragon-bai': 'Haku.png',
+  'flower-spring': 'spring.svg',
+  'flower-summer': 'summer.svg',
+  'flower-autumn': 'autumn.svg',
+  'flower-winter': 'winter.svg',
+  'flower-plum': 'plum.svg',
+  'flower-orchid': 'orchid.svg',
+  'flower-chrysanthemum': 'chrysanthemum.svg',
+  'flower-bamboo': 'bamboo.png',
+}
 
 const PIN_DOTS: Record<number, [number, number][]> = {
   1: [[50, 50]],
@@ -20,6 +80,14 @@ const PIN_DOTS: Record<number, [number, number][]> = {
   ],
 }
 
+function tileArt(folder: string, file: string) {
+  return `${import.meta.env.BASE_URL}tiles/${folder}/${file}`
+}
+
+function useTileSkin() {
+  return useSyncExternalStore(subscribeTileSkin, getTileSkin)
+}
+
 export type TileSize = 'sm' | 'md' | 'lg'
 
 interface TileProps {
@@ -32,11 +100,15 @@ interface TileProps {
   hinted?: boolean
   onClick?: () => void
   onDoubleClick?: () => void
+  /** 長按（約 450ms）取消揀牌 */
+  onLongPress?: () => void
   faceDown?: boolean
+  /** 設定頁預覽用；唔傳就跟已揀嘅牌面 */
+  skin?: TileSkinId
   className?: string
 }
 
-function tileFace(id: TileId, faceDown?: boolean) {
+function lineFace(id: TileId, faceDown?: boolean) {
   const info = faceDown ? null : parseTile(id)
   if (faceDown || !info) {
     return <span className="tile__back-pattern" />
@@ -67,6 +139,84 @@ function tileFace(id: TileId, faceDown?: boolean) {
   return <span className="tile__label">{info.label}</span>
 }
 
+function artFile(id: TileId, faceExt: 'svg' | 'png') {
+  const file = TILE_FILE[id]
+  if (!file) return null
+  if (faceExt === 'svg') return file.replace(/\.(png|svg)$/, '.svg')
+  return file
+}
+
+function tileFace(id: TileId, skin: TileSkinId, faceDown?: boolean) {
+  const opt = getTileSkinOption(skin)
+  const render = opt.render
+  if (render.mode === 'line') return lineFace(id, faceDown)
+
+  const bodyFile = `Front.${render.bodyExt}`
+  const backFile = `Back.${render.bodyExt}`
+  const filterStyle = render.filter
+    ? ({ filter: render.filter } as const)
+    : undefined
+
+  if (faceDown) {
+    const backFolder =
+      render.singleImage && render.body === 'relief'
+        ? 'relief'
+        : render.body
+    return (
+      <img
+        className="tile__img"
+        src={tileArt(backFolder, backFile)}
+        alt=""
+        draggable={false}
+        style={filterStyle}
+      />
+    )
+  }
+
+  const file = artFile(id, render.faceExt)
+  if (!file) return null
+
+  const svgRegional =
+    render.faceExt === 'svg' &&
+    (render.faces === 'hk' ||
+      render.faces === 'taiwan' ||
+      render.faces === 'malaysia' ||
+      render.faces === 'vietnam')
+
+  if (
+    render.singleImage ||
+    (id.startsWith('flower-') && !svgRegional)
+  ) {
+    const folder = id.startsWith('flower-') ? 'flowers' : render.faces
+    return (
+      <img
+        className="tile__img"
+        src={tileArt(folder, file)}
+        alt=""
+        draggable={false}
+        style={filterStyle}
+      />
+    )
+  }
+
+  return (
+    <span className="tile__stack" style={filterStyle}>
+      <img
+        className="tile__img tile__img--body"
+        src={tileArt(render.body, bodyFile)}
+        alt=""
+        draggable={false}
+      />
+      <img
+        className="tile__img tile__img--face"
+        src={tileArt(render.faces, file)}
+        alt=""
+        draggable={false}
+      />
+    </span>
+  )
+}
+
 export function Tile({
   id,
   size = 'md',
@@ -76,9 +226,14 @@ export function Tile({
   hinted,
   onClick,
   onDoubleClick,
+  onLongPress,
   faceDown,
+  skin,
   className = '',
 }: TileProps) {
+  const storedSkin = useTileSkin()
+  const activeSkin = skin ?? storedSkin
+  const holdRef = useRef<number | null>(null)
   const info = faceDown ? null : parseTile(id)
   const suitClass = info ? `tile--${info.suit}` : 'tile--back'
   const flowerTone =
@@ -95,7 +250,26 @@ export function Tile({
           ? 'tile--dragon-fa'
           : 'tile--dragon-bai'
       : ''
-  const interactive = Boolean(onClick || onDoubleClick)
+  const interactive = Boolean(onClick || onDoubleClick || onLongPress)
+  function clearHold() {
+    if (holdRef.current != null) {
+      window.clearTimeout(holdRef.current)
+      holdRef.current = null
+    }
+  }
+  function startHold() {
+    if (!onLongPress) return
+    clearHold()
+    holdRef.current = window.setTimeout(() => {
+      holdRef.current = null
+      onLongPress()
+    }, 450)
+  }
+  const numbered =
+    info &&
+    (info.suit === 'man' || info.suit === 'pin' || info.suit === 'sou')
+      ? info.rank
+      : undefined
   const classNames = [
     'tile',
     `tile--${size}`,
@@ -107,16 +281,22 @@ export function Tile({
     justDrawn ? 'tile--drawn' : '',
     hinted ? 'tile--hint' : '',
     interactive ? 'tile--clickable' : '',
+    getTileSkinOption(activeSkin).render.mode === 'line'
+      ? 'tile--line'
+      : '',
+    `tile-skin--${activeSkin}`,
     className,
   ]
     .filter(Boolean)
     .join(' ')
+  const rankAttr =
+    numbered != null ? ({ 'data-rank': String(numbered) } as const) : {}
 
-  // 對手牌背用 span，避免几十個 disabled button 塞爆無障礙樹
-  if (faceDown && !interactive) {
+  // 展示用／牌背用 span，避免几十個 disabled button 塞爆無障礙樹
+  if (!interactive) {
     return (
-      <span className={classNames} aria-hidden>
-        {tileFace(id, true)}
+      <span className={classNames} aria-hidden {...rankAttr}>
+        {tileFace(id, activeSkin, faceDown)}
       </span>
     )
   }
@@ -127,10 +307,21 @@ export function Tile({
       className={classNames}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      disabled={!interactive}
-      aria-label={faceDown ? '牌背' : (info?.label ?? id)}
+      onPointerDown={onLongPress ? startHold : undefined}
+      onPointerUp={onLongPress ? clearHold : undefined}
+      onPointerLeave={onLongPress ? clearHold : undefined}
+      onPointerCancel={onLongPress ? clearHold : undefined}
+      aria-label={
+        faceDown
+          ? '牌背'
+          : typeof document !== 'undefined' &&
+              document.documentElement.dataset.ariaTile === 'suit-rank'
+            ? id
+            : (info?.label ?? id)
+      }
+      {...rankAttr}
     >
-      {tileFace(id, faceDown)}
+      {tileFace(id, activeSkin, faceDown)}
     </button>
   )
 }
@@ -150,6 +341,10 @@ interface TileRowProps {
   onSelect?: (tile: TileId) => void
   /** 雙擊即打牌（由 TableView 決定是否合法） */
   onDoubleSelect?: (tile: TileId) => void
+  /** 長按取消揀牌 */
+  onClearSelect?: () => void
+  /** 拖曳改顯示次序。from、to 都係而家呢排的位置。 */
+  onReorder?: (from: number, to: number) => void
   faceDown?: boolean
   /** 左右座位用直排 */
   layout?: 'row' | 'col'
@@ -172,6 +367,8 @@ export function TileRow({
   selectable,
   onSelect,
   onDoubleSelect,
+  onClearSelect,
+  onReorder,
   faceDown,
   layout = 'row',
   face,
@@ -184,9 +381,76 @@ export function TileRow({
   const faceClass = face
     ? ` tile-face tile-face--${face} tile-face--${size}`
     : ''
+  const rowRef = useRef<HTMLDivElement>(null)
+  const stopDrag = useRef<(() => void) | null>(null)
+  const suppressClick = useRef(false)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
+  const sortable = Boolean(onReorder) && layout === 'row' && !face
+
+  useEffect(() => () => stopDrag.current?.(), [])
+
+  function indexAt(clientX: number): number {
+    const row = rowRef.current
+    if (!row) return 0
+    const slots = [...row.querySelectorAll<HTMLElement>(':scope > .tile-slot')]
+    let best = 0
+    let bestDist = Infinity
+    slots.forEach((el, k) => {
+      const rect = el.getBoundingClientRect()
+      const dist = Math.abs(clientX - (rect.left + rect.width / 2))
+      if (dist < bestDist) {
+        bestDist = dist
+        best = k
+      }
+    })
+    return best
+  }
+
+  function onSlotPointerDown(event: ReactPointerEvent, index: number) {
+    if (!onReorder || event.button !== 0) return
+    stopDrag.current?.()
+    const startX = event.clientX
+    const startY = event.clientY
+    let active = false
+    let over = index
+    const move = (ev: PointerEvent) => {
+      if (!active && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return
+      if (!active) {
+        active = true
+        suppressClick.current = true
+        setDragIndex(index)
+      }
+      over = indexAt(ev.clientX)
+      setOverIndex(over)
+    }
+    const up = () => {
+      stop()
+      if (active && over !== index) onReorder(index, over)
+      setDragIndex(null)
+      setOverIndex(null)
+      window.setTimeout(() => {
+        suppressClick.current = false
+      }, 0)
+    }
+    const stop = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      stopDrag.current = null
+    }
+    stopDrag.current = stop
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
   return (
     <div
-      className={`tile-row${layout === 'col' ? ' tile-row--col' : ''} ${className}`}
+      ref={rowRef}
+      className={`tile-row${layout === 'col' ? ' tile-row--col' : ''}${
+        sortable ? ' tile-row--sortable' : ''
+      } ${className}`}
     >
       {tiles.map((id, i) => {
         const isDrawn = drawnIndex === i
@@ -206,20 +470,57 @@ export function TileRow({
           size,
           selected: isSelected,
           dimmed: dimOthers,
-          justDrawn: isDrawn,
+          justDrawn: isDrawn && i === tiles.length - 1,
           hinted: hintIndex === i,
           faceDown,
-          className: isDrawn ? 'tile--drawn-slot' : '',
-          onClick: selectable && onSelect ? () => onSelect(id) : undefined,
+          className: [
+            isDrawn && i === tiles.length - 1 ? 'tile--drawn-slot' : '',
+            selectedFlags?.[i] ? 'tile--focus' : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+          onClick:
+            selectable && onSelect
+              ? () => {
+                  if (suppressClick.current) return
+                  onSelect(id)
+                }
+              : undefined,
           onDoubleClick:
             selectable && onDoubleSelect
-              ? () => onDoubleSelect(id)
+              ? () => {
+                  if (suppressClick.current) return
+                  onDoubleSelect(id)
+                }
+              : undefined,
+          onLongPress:
+            selectable && onClearSelect && loadLongPressClear()
+              ? onClearSelect
               : undefined,
         }
-        if (!face) return <Tile key={`${id}-${i}`} {...tileProps} />
+        if (!face && !sortable) return <Tile key={`${id}-${i}`} {...tileProps} />
+        const tile = <Tile {...tileProps} />
+        if (!face && sortable) {
+          const slotClass = [
+            'tile-slot',
+            dragIndex === i ? 'tile-slot--lift' : '',
+            overIndex === i && dragIndex !== i ? 'tile-slot--target' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+          return (
+            <span
+              key={`${id}-${i}`}
+              className={slotClass}
+              onPointerDown={(event) => onSlotPointerDown(event, i)}
+            >
+              {tile}
+            </span>
+          )
+        }
         return (
           <span key={`${id}-${i}`} className={faceClass.trim()}>
-            <Tile {...tileProps} />
+            {tile}
           </span>
         )
       })}
@@ -259,6 +560,7 @@ export function MeldGroup({
   selectedFlagsByMeld,
   onSelect,
   face,
+  caption = false,
 }: {
   melds: Meld[]
   size?: TileSize
@@ -269,13 +571,15 @@ export function MeldGroup({
   /** 撳副露牌 → 全枱同款高亮 */
   onSelect?: (tile: TileId) => void
   face?: 'left' | 'right'
+  /** 結算：牌底標上／碰／槓，唔好用色塊墊高 */
+  caption?: boolean
 }) {
   if (melds.length === 0) return null
   return (
     <div className={`meld-group${face ? ` meld-group--face-${face}` : ''}`}>
-      {melds.map((m, i) => (
-        <div key={i} className="meld" title={MELD_LABEL[m.kind] ?? m.kind}>
-          {m.kind === 'ankong'
+      {melds.map((m, i) => {
+        const nodes =
+          m.kind === 'ankong'
             ? m.tiles.map((t, j) =>
                 faceWrap(
                   face,
@@ -312,9 +616,19 @@ export function MeldGroup({
                     onClick={onSelect ? () => onSelect(t) : undefined}
                   />,
                 ),
-              )}
-        </div>
-      ))}
+              )
+        const label = MELD_LABEL[m.kind] ?? m.kind
+        return (
+          <div
+            key={i}
+            className={`meld${caption ? ' meld--cap' : ''}`}
+            title={label}
+          >
+            {caption ? <div className="meld__tiles">{nodes}</div> : nodes}
+            {caption ? <span className="meld__caption">{label}</span> : null}
+          </div>
+        )
+      })}
     </div>
   )
 }

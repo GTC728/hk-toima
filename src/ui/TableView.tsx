@@ -3,18 +3,26 @@ import {
   matchRoundLabel,
   type Action,
   type PrivateGameView,
-  type PublicPlayerView,
   type Seat,
   type TileId,
 } from '../engine'
 import { ActionBar } from './ActionBar'
-import { handForDisplay } from './handDisplay'
-import { FaceDownHand, MeldGroup, Tile, TileRow } from './tiles'
+import { ARRANGE_MODES, type ArrangeMode } from './handArrange'
+import { useHandArrange } from './useHandArrange'
+import { MeldsBlock, SeatMeta, WIND, type Slot } from './table/parts'
+import { RiverStrip } from './table/RiverStrip'
+import { SideSeat } from './table/SideSeat'
+import { FaceDownHand, Tile, TileRow } from './tiles'
+import { loadDoubleClickDiscard, loadKeyboardShortcuts } from './extraPrefs'
+import {
+  loadLowTimeSec,
+  loadShowRating,
+  loadWallMode,
+} from './leftoverPrefs'
+import { loadCareerStats } from './stats'
+import { gateAction } from './gateAction'
 import { useFitScale } from './useFitScale'
-
-const WIND = ['東', '南', '西', '北'] as const
-
-type Slot = 'bottom' | 'right' | 'top' | 'left'
+import { useTableKeyboard } from './useTableKeyboard'
 
 function relativeSeats(you: Seat): { seat: Seat; slot: Slot }[] {
   const order: Slot[] = ['bottom', 'right', 'top', 'left']
@@ -41,204 +49,12 @@ interface TableViewProps {
   onAction: (action: Action) => void
   hintDiscardTile?: TileId | null
   remainSec?: number | null
-}
-
-function SeatMeta({
-  seat,
-  p,
-  isHuman,
-}: {
-  seat: Seat
-  p: PublicPlayerView
-  isHuman: boolean
-}) {
-  return (
-    <div className="table__seat-meta">
-      <strong>
-        {WIND[seat]} · {p.name}
-      </strong>
-      <span className="table__seat-tags">
-        {p.isDealer && <em>莊</em>}
-        {p.ding && <em className="tag-ding">叮</em>}
-        {!isHuman && <em className="tag-ai">AI</em>}
-        <em className="tag-cash">${p.cash}</em>
-      </span>
-    </div>
-  )
-}
-
-function MeldsBlock({
-  p,
-  slot,
-  isYou,
-  selectedTile,
-  onSelectTile,
-}: {
-  p: PublicPlayerView
-  slot: Slot
-  isYou: boolean
-  selectedTile: TileId | null
-  onSelectTile: (t: TileId | null) => void
-}) {
-  if (p.melds.length === 0 && p.flowers.length === 0) return null
-  const side = slot === 'left' || slot === 'right'
-  const face = side ? slot : undefined
-  return (
-    <div
-      className={
-        side
-          ? 'table__melds table__melds--side'
-          : `table__melds table__orient table__orient--${slot}`
-      }
-    >
-      <MeldGroup
-        melds={p.melds}
-        size="sm"
-        face={face}
-        selected={selectedTile}
-        onSelect={
-          isYou
-            ? (t) => onSelectTile(selectedTile === t ? null : t)
-            : undefined
-        }
-      />
-      {p.flowers.length > 0 && (
-        <TileRow
-          tiles={p.flowers}
-          size="sm"
-          layout={side ? 'col' : 'row'}
-          face={face}
-          className="table__flowers"
-          selected={selectedTile}
-          selectable={isYou}
-          onSelect={
-            isYou
-              ? (t) => onSelectTile(selectedTile === t ? null : t)
-              : undefined
-          }
-        />
-      )}
-    </div>
-  )
-}
-
-function RiverStrip({
-  p,
-  slot,
-  selectedTile,
-  isFocus,
-}: {
-  p: PublicPlayerView
-  slot: Slot
-  selectedTile: TileId | null
-  isFocus: boolean
-}) {
-  const side = slot === 'left' || slot === 'right'
-  // 牌桌牌統一 sm，唔再獨立 scale（避免同副露／對手手牌大細唔同）
-  return (
-    <div
-      className={`table__river-strip table__river-strip--${slot}${
-        isFocus ? ' is-focus' : ''
-      }`}
-      aria-label={`${WIND[p.seat]}牌河`}
-    >
-      <div
-        className={
-          side
-            ? 'table__river-inner'
-            : `table__orient table__orient--${slot}`
-        }
-      >
-        {p.discards.length === 0 ? (
-          <span className="table__river-empty">—</span>
-        ) : (
-          <TileRow
-            tiles={p.discards}
-            size="sm"
-            layout={side ? 'col' : 'row'}
-            face={side ? slot : undefined}
-            className={`table__river-tiles${
-              side ? ' table__river-tiles--side' : ''
-            }`}
-            selected={selectedTile}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function SideSeat({
-  slot,
-  seat,
-  p,
-  isHuman,
-  isTurn,
-  selectedTile,
-  onSelectTile,
-}: {
-  slot: 'left' | 'right'
-  seat: Seat
-  p: PublicPlayerView
-  isHuman: boolean
-  isTurn: boolean
-  selectedTile: TileId | null
-  onSelectTile: (t: TileId | null) => void
-}) {
-  return (
-    <section
-      className={`table__edge table__edge--${slot}${
-        isTurn ? ' is-turn' : ''
-      }`}
-    >
-      <SeatMeta seat={seat} p={p} isHuman={isHuman} />
-      <div className="table__side-fit">
-        <div
-          className={`table__side-stack${
-            slot === 'right' ? ' table__side-stack--right' : ''
-          }`}
-        >
-          {slot === 'left' ? (
-            <>
-              <div className="table__side-hand">
-                <FaceDownHand
-                  count={p.handCount}
-                  size="sm"
-                  layout="col"
-                  face="left"
-                />
-              </div>
-              <MeldsBlock
-                p={p}
-                slot="left"
-                isYou={false}
-                selectedTile={selectedTile}
-                onSelectTile={onSelectTile}
-              />
-            </>
-          ) : (
-            <>
-              <MeldsBlock
-                p={p}
-                slot="right"
-                isYou={false}
-                selectedTile={selectedTile}
-                onSelectTile={onSelectTile}
-              />
-              <div className="table__side-hand">
-                <FaceDownHand
-                  count={p.handCount}
-                  size="sm"
-                  layout="col"
-                  face="right"
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </section>
-  )
+  /** AI 座位名旁嘅性格；真人位留空 */
+  personaLabels?: (string | null)[]
+  /** 開桌頁的樣子：同一塊檯，但未開局 */
+  staticTable?: boolean
+  /** 重溫：四家攤開手牌（用牌桌系統） */
+  reviewHands?: TileId[][] | null
 }
 
 export function TableView({
@@ -251,13 +67,23 @@ export function TableView({
   onAction,
   hintDiscardTile = null,
   remainSec = null,
+  personaLabels,
+  staticTable = false,
+  reviewHands = null,
 }: TableViewProps) {
   const seats = relativeSeats(view.you)
   const pending = view.pendingDiscard
   const youPlayer = view.players[view.you]!
-  const waiting = getWaitingTiles(view.hand, youPlayer.melds)
+  const reviewing = reviewHands != null
+  const frozen = staticTable || reviewing
+  const waiting = frozen
+    ? []
+    : getWaitingTiles(view.hand, youPlayer.melds)
   const roundLabel = matchRoundLabel(view.windRound, view.dealer)
-  const myHand = handForDisplay(view.hand, view.justDrawn)
+  const arrange = useHandArrange(view)
+  const myHand = reviewing
+    ? (reviewHands[view.you] ?? arrange.tiles)
+    : arrange.tiles
 
   const top = bySlot(seats, 'top')
   const left = bySlot(seats, 'left')
@@ -266,7 +92,29 @@ export function TableView({
 
   const handFit = useFitScale([myHand.length, selectedTile])
 
+  function sendAction(action: Parameters<typeof onAction>[0]) {
+    gateAction(action, onAction)
+  }
+
+  useTableKeyboard({
+    enabled: !frozen && loadKeyboardShortcuts(),
+    selectedTile,
+    legal: view.legalActions,
+    declareDing,
+    onSelectTile,
+    onToggleDing,
+    onAction: sendAction,
+  })
+
   function isTurn(seat: Seat) {
+    if (frozen) {
+      return (
+        reviewing &&
+        ((view.phase === 'playing' && view.currentSeat === seat) ||
+          (view.phase === 'claim_window' &&
+            (pending?.awaiting.includes(seat) ?? false)))
+      )
+    }
     return (
       (view.phase === 'playing' && view.currentSeat === seat) ||
       (view.phase === 'claim_window' &&
@@ -278,29 +126,63 @@ export function TableView({
   const pLeft = view.players[left]!
   const pRight = view.players[right]!
   const pBottom = view.players[bottom]!
+  const wallMode = loadWallMode()
+  const lowAt = loadLowTimeSec()
+  const rating =
+    loadShowRating() && !frozen
+      ? loadCareerStats().rounds > 0
+        ? `戰 ${loadCareerStats().wins}/${loadCareerStats().rounds}`
+        : null
+      : null
+
+  const showWall = !staticTable || reviewing
 
   return (
-    <div className="table">
+    <div className={`table${reviewing ? ' table--review' : ''}`}>
       <header className="table__hud">
         <div className="table__brand-mini">
-          <span>香港台麻</span>
+          <span>{reviewing ? '重溫' : '香港台麻'}</span>
           <em>HK ToiMA</em>
         </div>
         <div className="table__stats">
           <span>{roundLabel}</span>
           <span>第 {view.round} 局</span>
-          <span>牆 {view.wallRemaining}</span>
+          {wallMode !== 'off' && (
+            <span className="table__wall-stat">
+              {wallMode === 'bar' ? (
+                <span
+                  className="table__wall-bar"
+                  title={`牆 ${view.wallRemaining}`}
+                >
+                  <i
+                    style={{
+                      width: `${Math.min(100, (view.wallRemaining / 144) * 100)}%`,
+                    }}
+                  />
+                </span>
+              ) : (
+                <>牆 {showWall ? view.wallRemaining : '—'}</>
+              )}
+            </span>
+          )}
           <span>
             莊 {WIND[view.dealer]}
-            {view.consecutiveWins > 0 ? ` · 連${view.consecutiveWins}` : ''}
+            {!frozen && view.consecutiveWins > 0
+              ? ` · 連${view.consecutiveWins}`
+              : reviewing && view.consecutiveWins > 0
+                ? ` · 連${view.consecutiveWins}`
+                : ''}
           </span>
-          <span>骰 {view.dice.join('·')}</span>
+          {(!frozen || reviewing) && (
+            <span className="table__dice-stat">骰 {view.dice.join('·')}</span>
+          )}
           <span>
             底 {view.rules.base}番 · ${view.rules.fanValue}/番
           </span>
-          {remainSec != null && (
+          {rating && <span className="table__rating-stat">{rating}</span>}
+          {!frozen && remainSec != null && (
             <span
-              className={`table__timer${remainSec <= 5 ? ' is-urgent' : ''}`}
+              className={`table__timer table__timer-stat${remainSec <= lowAt ? ' is-urgent' : ''}`}
               role="timer"
               aria-live="polite"
             >
@@ -311,6 +193,30 @@ export function TableView({
       </header>
 
       <div className="table__felt">
+        {!frozen && <label className="table__arrange">
+          排牌
+          <select
+            aria-label="排牌方式"
+            title={
+              arrange.manual
+                ? '拖過牌，再揀一種排法就會重新排'
+                : ARRANGE_MODES.find((m) => m.id === arrange.mode)?.hint
+            }
+            value={arrange.manual ? 'manual' : arrange.mode}
+            onChange={(e) => {
+              const next = e.target.value
+              if (next === 'manual') return
+              arrange.choose(next as ArrangeMode)
+            }}
+          >
+            {arrange.manual ? <option value="manual">手動</option> : null}
+            {ARRANGE_MODES.map((m) => (
+              <option key={m.id} value={m.id} title={m.hint}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>}
         <section
           className={`table__edge table__edge--top${
             isTurn(top) ? ' is-turn' : ''
@@ -318,14 +224,27 @@ export function TableView({
         >
           <SeatMeta
             seat={top}
-            p={pTop}
+            p={
+              reviewing
+                ? { ...pTop, handCount: reviewHands[top]?.length ?? pTop.handCount }
+                : pTop
+            }
             isHuman={isHuman[top]!}
+            personaLabel={personaLabels?.[top]}
           />
           <div className="table__orient table__orient--top">
-            <FaceDownHand count={pTop.handCount} size="sm" />
+            {reviewing ? (
+              <TileRow tiles={reviewHands[top] ?? []} size="sm" />
+            ) : (
+              <FaceDownHand count={pTop.handCount} size="sm" />
+            )}
           </div>
           <MeldsBlock
-            p={pTop}
+            p={
+              reviewing
+                ? { ...pTop, melds: view.players[top]!.melds }
+                : pTop
+            }
             slot="top"
             isYou={false}
             selectedTile={selectedTile}
@@ -336,11 +255,17 @@ export function TableView({
         <SideSeat
           slot="left"
           seat={left}
-          p={pLeft}
+          p={
+            reviewing
+              ? { ...pLeft, handCount: reviewHands[left]?.length ?? pLeft.handCount }
+              : pLeft
+          }
           isHuman={isHuman[left]!}
           isTurn={isTurn(left)}
           selectedTile={selectedTile}
           onSelectTile={onSelectTile}
+          personaLabel={personaLabels?.[left]}
+          openHand={reviewing ? reviewHands[left] : null}
         />
 
         <div className="table__mouth" aria-label="牌河與中控">
@@ -349,27 +274,38 @@ export function TableView({
             slot="top"
             selectedTile={selectedTile}
             isFocus={pending?.seat === top}
+            pendingTile={pending?.tile}
           />
           <RiverStrip
             p={pLeft}
             slot="left"
             selectedTile={selectedTile}
             isFocus={pending?.seat === left}
+            pendingTile={pending?.tile}
           />
           <div className="table__console">
             <p className="table__console-round">{roundLabel}</p>
-            <p>
-              牆 {view.wallRemaining}
-              {view.consecutiveWins > 0
-                ? ` · 連${view.consecutiveWins}`
-                : ''}
+            <p className="table__console-wall table__wall-stat">
+              {staticTable && !reviewing ? '—' : view.wallRemaining}
             </p>
-            <p>
+            <p className="table__console-label table__wall-stat">
+              {staticTable && !reviewing
+                ? '未開局'
+                : reviewing
+                  ? view.phase === 'claim_window'
+                    ? '鳴牌'
+                    : view.phase === 'round_over' || view.phase === 'match_over'
+                      ? '結算'
+                      : '剩餘'
+                  : '剩餘'}
+              {!frozen && view.consecutiveWins > 0 ? ` · 連${view.consecutiveWins}` : ''}
+            </p>
+            <p className="table__console-label">
               底 {view.rules.base}番 · ${view.rules.fanValue}
             </p>
-            {remainSec != null && (
+            {!staticTable && remainSec != null && (
               <p
-                className={`table__console-timer${
+                className={`table__console-timer table__timer-stat${
                   remainSec <= 5 ? ' is-urgent' : ''
                 }`}
               >
@@ -395,23 +331,34 @@ export function TableView({
             slot="right"
             selectedTile={selectedTile}
             isFocus={pending?.seat === right}
+            pendingTile={pending?.tile}
           />
           <RiverStrip
             p={pBottom}
             slot="bottom"
             selectedTile={selectedTile}
             isFocus={pending?.seat === bottom}
+            pendingTile={pending?.tile}
           />
         </div>
 
         <SideSeat
           slot="right"
           seat={right}
-          p={pRight}
+          p={
+            reviewing
+              ? {
+                  ...pRight,
+                  handCount: reviewHands[right]?.length ?? pRight.handCount,
+                }
+              : pRight
+          }
           isHuman={isHuman[right]!}
           isTurn={isTurn(right)}
           selectedTile={selectedTile}
           onSelectTile={onSelectTile}
+          personaLabel={personaLabels?.[right]}
+          openHand={reviewing ? reviewHands[right] : null}
         />
 
         <section
@@ -421,8 +368,16 @@ export function TableView({
         >
           <SeatMeta
             seat={bottom}
-            p={pBottom}
+            p={
+              reviewing
+                ? {
+                    ...pBottom,
+                    handCount: reviewHands[bottom]?.length ?? pBottom.handCount,
+                  }
+                : pBottom
+            }
             isHuman={isHuman[bottom]!}
+            personaLabel={personaLabels?.[bottom]}
           />
           <MeldsBlock
             p={pBottom}
@@ -431,16 +386,16 @@ export function TableView({
             selectedTile={selectedTile}
             onSelectTile={onSelectTile}
           />
-          <ActionBar
+          {!frozen && <ActionBar
             legal={view.legalActions}
             selectedTile={selectedTile}
             declareDingWithDiscard={declareDing}
             onToggleDing={onToggleDing}
-            onAction={onAction}
+            onAction={sendAction}
             pendingTile={pending?.tile}
             waitingTiles={waiting}
             mustDiscard={view.mustDiscard}
-          />
+          />}
           <div className="table__hand-fit" ref={handFit.outerRef}>
             <div
               className="table__fit-inner"
@@ -453,22 +408,30 @@ export function TableView({
               <TileRow
                 tiles={myHand}
                 size="lg"
-                selected={selectedTile}
-                justDrawn={view.justDrawn}
-                hinted={hintDiscardTile}
-                selectable
-                onSelect={(t) => onSelectTile(t)}
-                onDoubleSelect={(t) => {
-                  const ok = view.legalActions.some(
-                    (a) => a.type === 'discard' && a.tile === t,
-                  )
-                  if (!ok) return
-                  onAction({
-                    type: 'discard',
-                    tile: t,
-                    declareDing: declareDing || undefined,
-                  })
-                }}
+                selected={frozen ? null : selectedTile}
+                justDrawn={frozen ? null : view.justDrawn}
+                hinted={frozen ? null : hintDiscardTile}
+                selectable={!frozen}
+                onReorder={frozen ? undefined : arrange.reorder}
+                onSelect={frozen ? undefined : (t) => onSelectTile(t)}
+                onClearSelect={
+                  frozen ? undefined : () => onSelectTile(null)
+                }
+                onDoubleSelect={
+                  frozen || !loadDoubleClickDiscard()
+                    ? undefined
+                    : (t) => {
+                        const ok = view.legalActions.some(
+                          (a) => a.type === 'discard' && a.tile === t,
+                        )
+                        if (!ok) return
+                        sendAction({
+                          type: 'discard',
+                          tile: t,
+                          declareDing: declareDing || undefined,
+                        })
+                      }
+                }
               />
             </div>
           </div>

@@ -74,6 +74,56 @@ describe('常見枱表 · 大包細互斥', () => {
     expect(ids).not.toContain('wuzihua')
   })
 
+  it('叮摸／天胡唔加自摸', () => {
+    // 十六不搭：叮＋自摸 → 叮摸吞自摸
+    const shiliu: TileId[] = [
+      'man-1', 'man-4', 'man-7',
+      'pin-2', 'pin-5', 'pin-8',
+      'sou-3', 'sou-6', 'sou-9',
+      'wind-east', 'wind-west', 'wind-north',
+      'dragon-zhong', 'dragon-fa', 'dragon-bai',
+      'wind-south',
+    ]
+    const dingmoFans = calculateFans({
+      hand: shiliu,
+      melds: [],
+      flowers: ['flower-bamboo', 'flower-orchid'],
+      winTile: 'wind-south',
+      winType: 'tsumo',
+      ding: { kind: 'normal', ippatsuActive: false, guoshuiLocked: false },
+      isDealer: false,
+      consecutiveWins: 0,
+      seat: 1,
+      windRound: 0,
+      discardsThisRound: 20,
+    })
+    expect(dingmoFans.map((f) => f.id)).toContain('dingmo')
+    expect(dingmoFans.map((f) => f.id)).not.toContain('zimo')
+
+    // 台牌 16 張手＋糊；莊家零打牌自摸 → 天胡吞自摸
+    const tianFans = calculateFans({
+      hand: [
+        'man-1', 'man-2', 'man-3',
+        'man-4', 'man-5', 'man-6',
+        'pin-1', 'pin-2', 'pin-3',
+        'sou-1', 'sou-2', 'sou-3',
+        'sou-4', 'sou-5', 'sou-6',
+        'pin-5',
+      ],
+      melds: [],
+      flowers: ['flower-spring'],
+      winTile: 'pin-5',
+      winType: 'tsumo',
+      ding: null,
+      isDealer: true,
+      consecutiveWins: 0,
+      seat: 0,
+      discardsThisRound: 0,
+    })
+    expect(tianFans.map((f) => f.id)).toContain('tianhu')
+    expect(tianFans.map((f) => f.id)).not.toContain('zimo')
+  })
+
   it('半求人唔加自摸', () => {
     const melds: Meld[] = [
       {
@@ -125,7 +175,7 @@ describe('常見枱表 · 大包細互斥', () => {
     expect(ids).not.toContain('zimo')
   })
 
-  it('缺一門唔再計無字', () => {
+  it('缺一門可同無字並計', () => {
     const fans = calculateFans({
       hand: [
         'man-1', 'man-1', 'man-1',
@@ -153,6 +203,7 @@ describe('常見枱表 · 大包細互斥', () => {
     })
     const ids = fans.map((f) => f.id)
     expect(ids).toContain('queimen')
-    expect(ids).not.toContain('wuzi')
+    expect(ids).toContain('wuzi')
+    expect(fans.find((f) => f.id === 'queimen')!.value).toBe(5)
   })
 })

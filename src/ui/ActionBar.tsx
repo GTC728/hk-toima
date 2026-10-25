@@ -1,4 +1,5 @@
 import { parseTile, type Action, type TileId } from '../engine'
+import { loadShowWaiting } from './extraPrefs'
 
 function tileLabel(id: TileId): string {
   try {
@@ -27,9 +28,7 @@ export function ActionBar({
   declareDingWithDiscard,
   onToggleDing,
   onAction,
-  pendingTile,
   waitingTiles = [],
-  mustDiscard = false,
 }: ActionBarProps) {
   const canWin = legal.some((a) => a.type === 'win')
   const canPong = legal.some((a) => a.type === 'pong')
@@ -45,27 +44,13 @@ export function ActionBar({
   const anKongs = legal.filter((a) => a.type === 'ankong')
   const jiaGangs = legal.filter((a) => a.type === 'jiagang')
   const mingKong = legal.find((a) => a.type === 'mingkong')
-  const canClaimMeld =
-    canWin || canPong || Boolean(mingKong) || chiOptions.length > 0
 
   return (
     <div className="action-bar">
-      {waitingTiles.length > 0 && (
+      {loadShowWaiting() && waitingTiles.length > 0 && (
         <p className="action-bar__waiting" role="status">
           等：{waitingTiles.map(tileLabel).join(' · ')}
         </p>
-      )}
-      {pendingTile && canClaimMeld && (
-        <p className="action-bar__pending">有人打出 · 可鳴／食</p>
-      )}
-      {pendingTile && !canClaimMeld && canPass && (
-        <p className="action-bar__pending">有人打出 · 已被更高優先鳴牌</p>
-      )}
-      {mustDiscard && discardLegal.length > 0 && (
-        <p className="action-bar__pending">上／碰後請打牌</p>
-      )}
-      {!mustDiscard && discardLegal.length > 0 && !canDraw && (
-        <p className="action-bar__pending">請打牌</p>
       )}
 
       <div className="action-bar__row">

@@ -1,13 +1,15 @@
 /**
- * Rebuild public frames from actionLog for settlement 重溫.
- * Hides other hands until the final (round_over) frame.
+ * 由牌譜（seed + plies）重建每步枱面幀，供賽後重溫。
  */
 
 import {
-  applyAction,
+  afterPlayerAction,
   createGame,
+  formatActionText,
   getPublicView,
+  type Action,
   type ActionLogEntry,
+  type GameRecord,
   type GameState,
   type PublicGameView,
   type Seat,
@@ -17,11 +19,13 @@ import {
 export interface ReplayFrame {
   index: number
   public: PublicGameView
-  /** Only set on final frame — full hands for 攤牌 */
-  revealHands?: TileId[][]
+  /** 重溫全程可睇手牌演變 */
+  hands: TileId[][]
+  melds: GameState['players'][0]['melds'][]
   note?: string
   seat: Seat | null
   actionType: string
+  ply?: ActionLogEntry
 }
 
 /** Minimal input for replay (GameState or terminal PublicGameView) */
@@ -34,6 +38,8 @@ export interface ReplaySource {
   actionLog: ActionLogEntry[]
   players?: { hand: TileId[] }[]
   revealedHands?: TileId[][]
+  round?: number
+  windRound?: number
 }
 
 export function replaySourceFromState(state: GameState): ReplaySource {
@@ -46,6 +52,8 @@ export function replaySourceFromState(state: GameState): ReplaySource {
     actionLog: state.actionLog,
     players: state.players,
     revealedHands: state.players.map((p) => [...p.hand]),
+    round: state.round,
+    windRound: state.windRound,
   }
 }
 
@@ -61,6 +69,20 @@ export function replaySourceFromView(view: PublicGameView): ReplaySource {
   }
 }
 
+export function replaySourceFromRecord(record: GameRecord): ReplaySource {
+  return {
+    seed: record.header.seed,
+    dealer: record.header.dealer,
+    consecutiveWins: record.header.consecutiveWins,
+    rules: record.header.rules,
+    phase: record.phase ?? 'round_over',
+    actionLog: record.plies,
+    revealedHands: record.revealedHands,
+    round: record.header.round,
+    windRound: record.header.windRound,
+  }
+}
+
 /** Index of first log entry belonging to the current round */
 export function currentRoundLogStart(log: ActionLogEntry[]): number {
   for (let i = log.length - 1; i >= 0; i--) {
@@ -71,8 +93,19 @@ export function currentRoundLogStart(log: ActionLogEntry[]): number {
 }
 
 /**
+ * 內部已摸完：牌譜入面跟住嘅 draw 係顯示用，重放要 skip。
+ */
+function shouldSkipDraw(state: GameState, action: Action): boolean {
+  if (action.type !== 'draw') return false
+  if (state.justDrawn != null) return true
+  if (state.mustDiscard) return true
+  if (state.phase !== 'playing') return true
+  return false
+}
+
+/**
  * Replay this round from seed / dealer / consecutiveWins.
- * Returns public frames; last frame includes revealHands when terminal.
+ * Uses afterPlayerAction so auto-pass 同真實對局一致。
  */
 export function buildReplayFrames(
   source: ReplaySource,
@@ -91,10 +124,16 @@ export function buildReplayFrames(
   })
   state.actionLog = []
 
+  const snapshot = (s: GameState): Pick<ReplayFrame, 'hands' | 'melds'> => ({
+    hands: s.players.map((p) => [...p.hand]),
+    melds: s.players.map((p) => p.melds.map((m) => ({ ...m, tiles: [...m.tiles] }))),
+  })
+
   const frames: ReplayFrame[] = [
     {
       index: 0,
       public: getPublicView(state, labels),
+      ...snapshot(state),
       seat: null,
       actionType: 'start',
       note: '開局',
@@ -106,52 +145,53 @@ export function buildReplayFrames(
     const { action, seat, note } = entry
     if (action.type === 'start') continue
     if (action.type === 'nextRound') continue
+
+    if (shouldSkipDraw(state, action)) {
+      // 仍推一幀顯示「摸牌」文案，但唔改狀態（已摸）
+      frames.push({
+        index: frames.length,
+        public: getPublicView(state, labels),
+        ...snapshot(state),
+        seat,
+        actionType: action.type,
+        note: note ?? formatActionText(action, {}, seat),
+        ply: entry,
+      })
+      continue
+    }
+
     try {
-      state = applyAction(state, action, seat ?? undefined)
+      // draw 用 apply 路徑：afterPlayerAction → applyAction；draw 本身唔經 autoPass
+      state = afterPlayerAction(state, action, seat ?? undefined)
     } catch {
       continue
     }
     frames.push({
       index: frames.length,
       public: getPublicView(state, labels),
+      ...snapshot(state),
       seat,
       actionType: action.type,
-      note: note ?? actionLabel(action.type),
+      note: note ?? formatActionText(action, {}, seat),
+      ply: entry,
     })
   }
 
   const last = frames[frames.length - 1]
   const terminal =
-    source.phase === 'round_over' ||
-    source.phase === 'match_over' ||
-    source.phase === 'wall_exhausted'
+    source.phase === 'round_over' || source.phase === 'match_over'
   if (last && terminal) {
-    last.revealHands =
+    const reveal =
       source.revealedHands ??
       source.players?.map((p) => [...p.hand]) ??
-      state.players.map((p) => [...p.hand])
+      last.hands
+    last.hands = reveal
     last.public = {
       ...last.public,
       phase: source.phase,
-      revealedHands: last.revealHands,
+      revealedHands: reveal,
     }
   }
 
   return frames
-}
-
-function actionLabel(type: string): string {
-  const map: Record<string, string> = {
-    draw: '摸',
-    discard: '打',
-    chi: '上',
-    pong: '碰',
-    mingkong: '明槓',
-    ankong: '暗槓',
-    jiagang: '加槓',
-    win: '食',
-    pass: 'Pass',
-    declareDing: '叮',
-  }
-  return map[type] ?? type
 }

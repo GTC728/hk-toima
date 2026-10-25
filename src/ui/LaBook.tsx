@@ -65,9 +65,10 @@ function seatNet(ledger: LaEntry[], seat: Seat): number {
 
 interface LaBookProps {
   onBack: () => void
+  backLabel?: string
 }
 
-export function LaBook({ onBack }: LaBookProps) {
+export function LaBook({ onBack, backLabel = '← 返大廳' }: LaBookProps) {
   const initial = loadPersist()
   const [names, setNames] = useState(initial.names)
   const [maxLaKou, setMaxLaKou] = useState(initial.maxLaKou)
@@ -183,7 +184,7 @@ export function LaBook({ onBack }: LaBookProps) {
     <main className="labook">
       <header className="labook__header">
         <button type="button" className="fan-page__back" onClick={onBack}>
-          ← 返大廳
+          {backLabel}
         </button>
         <p className="fan-page__eyebrow">HK ToiMa</p>
         <h1 className="fan-page__title">拉數簿</h1>

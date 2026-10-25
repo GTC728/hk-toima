@@ -6,7 +6,7 @@
   "description": "香港台麻 HK ToiMA — 港式台牌（十六張）",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p tsconfig.worker.json --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",

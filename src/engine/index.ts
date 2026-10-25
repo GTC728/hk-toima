@@ -9,6 +9,7 @@ export {
   getPrivateView,
   getLegalActions,
   autoPassImpossibleClaims,
+  afterPlayerAction,
   discardAndResolve,
   WIND_LABELS,
   windRoundLabel,
@@ -17,13 +18,26 @@ export {
   ZHENG_HUA,
   zhengHuaForSeat,
 } from './game'
-export { chooseAiAction, discardKeepScore, visibleTileCounts } from './ai'
+export {
+  chooseAiAction,
+  chooseDiscardTile,
+  discardKeepScore,
+  visibleTileCounts,
+  AI_PERSONA_LABEL,
+  AI_PERSONA_ORDER,
+  defaultAiPersonas,
+  displayPersonas,
+  isAiPersona,
+  nextAiPersona,
+} from './ai'
+export type { AiPersona } from './ai'
 export { hintDiscard, getWaitingTiles, timeoutPlayAction } from './hints'
 export {
   deadlineFromOpened,
   isExpired,
   remainingSec,
 } from './turn-timer'
+export { AI_DELAY_MS, aiThinkMs } from './timing'
 export { canWin, isReady, waitingTiles, findStandardWins, isLiguligu, isThirteenOrphans } from './win-check'
 export {
   calculateFans,
@@ -38,6 +52,7 @@ export {
   FAN_TABLE_META,
 } from './fan'
 export type { FanMeta } from './fan-catalog'
+export type { FanHit, FanShop } from './fan'
 export {
   amountFromFan,
   buildWinResult,
@@ -64,7 +79,41 @@ export {
 } from './tiles'
 export { dealWall, wallRemaining } from './wall'
 export { makeMeld } from './meld'
+export {
+  formatActionText,
+  formatPly,
+  gameRecordFromState,
+  isHiddenPly,
+  parseRecordKey,
+  recordKey,
+  tileLabel as recordTileLabel,
+  visiblePlies,
+  whoName as recordWhoName,
+} from './game-record'
+export type {
+  FormatPlyOpts,
+  GameRecord,
+  GameRecordHeader,
+  GameRecordPlayer,
+  GameRecordSummary,
+} from './game-record'
 export { DEFAULT_RULES, DEFAULT_STARTING_CASH } from './types'
+export {
+  RANKED_AI_RATING,
+  RANKED_DEFAULT,
+  RANK_TIERS,
+  applyRankedMatch,
+  clampRating,
+  emptyRanked,
+  expectedScore,
+  kFactor,
+  placeScore,
+  placesByCash,
+  ratingDelta,
+  ratingWindowMs,
+  tierForRating,
+} from './ranked'
+export type { RankTier, RankTierId, RankedState } from './ranked'
 export type {
   Action,
   ActionLogEntry,

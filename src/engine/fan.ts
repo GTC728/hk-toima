@@ -32,9 +32,10 @@ import {
   scoreYaoJiu,
   tongShunBestCount,
   type FanHit,
+  type FanShop,
 } from './fan-patterns'
 
-export type { FanHit }
+export type { FanHit, FanShop }
 
 /** @deprecated 用 fan-catalog；保留兼容 */
 export { FAN_TABLE_META as fansTable, FAN_TABLE_META } from './fan-catalog'
@@ -78,9 +79,14 @@ function hit(id: string, override?: number): FanHit {
   return makeHit(fanValue)(id, override)
 }
 
-/** 暗槓不破門清；上／碰／明槓／加槓破 */
+/** 偏高檔：上／碰破門清；槓（明／暗／加）唔破 */
 export function checkMenqing(melds: Meld[]): boolean {
-  return melds.every((m) => m.kind === 'ankong')
+  return melds.every(
+    (m) =>
+      m.kind === 'ankong' ||
+      m.kind === 'mingkong' ||
+      m.kind === 'jiagang',
+  )
 }
 
 function suitsUsed(tiles: TileId[]): Set<string> {
@@ -148,12 +154,30 @@ function isAllHonors(tiles: TileId[]): boolean {
 }
 
 function scoreTongShun(
+  chis: ReturnType<typeof collectChis>,
   best: number,
   fiveFan: number,
 ): FanHit[] {
   const out: FanHit[] = []
-  if (best >= 5) out.push(hit('wutongshun', fiveFan))
-  else if (best >= 4) out.push(hit('sitongshun'))
+  if (best < 4) return out
+  const freq = new Map<string, typeof chis>()
+  for (const c of chis) {
+    const arr = freq.get(c.rankKey) ?? []
+    arr.push(c)
+    freq.set(c.rankKey, arr)
+  }
+  let group: typeof chis = []
+  for (const arr of freq.values()) {
+    if (arr.length > group.length) group = arr
+  }
+  const dark = group.length > 0 && group.every((c) => c.concealed)
+  if (best >= 5) {
+    out.push(
+      hit(dark ? 'anwutongshun' : 'mingwutongshun', dark ? fiveFan * 2 : fiveFan),
+    )
+  } else {
+    out.push(hit(dark ? 'ansitongshun' : 'mingsitongshun'))
+  }
   return out
 }
 
@@ -164,25 +188,26 @@ function scorePartition(ctx: ScoreContext, partition: WinPartition | null): FanH
   const discards = ctx.discardsThisRound ?? 99
   const multiRon = ctx.multiRonCount ?? 1
   const fiveFan = ctx.fiveTongShunFan ?? 40
-  const excludeParts = ctx.excludeBanGaoXiangFengAfterWuTong ?? true
+  // 預設 false：四五同順後仍計般高／相逢（協會寫法）；true＝坊間吞組件
+  const excludeParts = ctx.excludeBanGaoXiangFengAfterWuTong ?? false
   const tilesNoFlower = [
     ...ctx.hand,
     ctx.winTile,
     ...ctx.melds.flatMap((m) => m.tiles),
   ]
 
-  if (ctx.melds.length === 0 && isThirteenOrphans(ctx.hand, ctx.winTile)) {
-    fans.push(hit('shisanyao'))
-  }
-  if (ctx.melds.length === 0 && isLiguligu(ctx.hand, ctx.winTile)) {
-    fans.push(hit('liguligu'))
-  }
-  if (ctx.melds.length === 0 && isSixteenBuDa(ctx.hand, ctx.winTile)) {
-    fans.push(hit('shiliubuda'))
+  // 特殊型只掛喺 partition=null 嗰舖；雙食時標準拆法唔好再疊嚦咕
+  if (partition == null && ctx.melds.length === 0) {
+    if (isThirteenOrphans(ctx.hand, ctx.winTile)) fans.push(hit('shisanyao'))
+    if (isLiguligu(ctx.hand, ctx.winTile)) fans.push(hit('liguligu'))
+    if (isSixteenBuDa(ctx.hand, ctx.winTile)) fans.push(hit('shiliubuda'))
   }
 
   const chis = collectChis(partition, ctx.melds)
-  const pongs = collectPongs(partition, ctx.melds)
+  const pongs = collectPongs(partition, ctx.melds, {
+    winTile: ctx.winTile,
+    winType: ctx.winType,
+  })
   const tongBest = tongShunBestCount(chis)
 
   let isDuiDui = false
@@ -196,10 +221,10 @@ function scorePartition(ctx: ScoreContext, partition: WinPartition | null): FanH
         fans.push(hit('pinghu'))
       }
     }
+    // 偏高檔：對對糊獨立；門清／門清自摸另計（唔併成機機糊）
     if (isAllPongs(partition, ctx.melds)) {
       isDuiDui = true
-      if (menqing && ctx.winType === 'tsumo') fans.push(hit('jijihu'))
-      else fans.push(hit('duiduihu'))
+      fans.push(hit('duiduihu'))
     }
 
     const dr = countDragonPongs(partition, ctx.melds)
@@ -212,7 +237,7 @@ function scorePartition(ctx: ScoreContext, partition: WinPartition | null): FanH
     else if (wd.pongs === 3) fans.push(hit('dasifeng'))
     else if (wd.pongs === 2 && wd.pairIsWind) fans.push(hit('xiaosifeng'))
 
-    fans.push(...scoreTongShun(tongBest, fiveFan))
+    fans.push(...scoreTongShun(chis, tongBest, fiveFan))
     fans.push(
       ...scoreBanGaoXiangFeng(chis, tongBest, excludeParts, hit),
     )
@@ -261,17 +286,22 @@ function scorePartition(ctx: ScoreContext, partition: WinPartition | null): FanH
     else fans.push(hit('quanqiuren'))
   }
 
+  // 偏高檔：門清＋門清自摸可並計（對照片）；叮時用門清叮一档
   if (menqing) {
     if (ctx.ding) fans.push(hit('menqing_ding'))
-    else if (ctx.winType === 'tsumo') fans.push(hit('menqing_zimo'))
-    else fans.push(hit('menqing'))
+    else {
+      fans.push(hit('menqing'))
+      if (ctx.winType === 'tsumo') fans.push(hit('menqing_zimo'))
+    }
   }
 
   if (ctx.ding) {
     if (ctx.ding.kind === 'tian') fans.push(hit('tianting'))
     else if (ctx.ding.kind === 'di') fans.push(hit('diting'))
-    else if (!menqing) fans.push(hit('ding'))
+    else fans.push(hit('ding')) // 門清時由門清叮吞；十六不搭吞門清叮後仍留叮 5
     if (ctx.ding.ippatsuActive) fans.push(hit('ippatsu'))
+    // 叮摸：已叮兼自摸（同即食分開；即食＝叮後一巡內）
+    if (ctx.winType === 'tsumo') fans.push(hit('dingmo'))
   }
 
   if (ctx.winType === 'tsumo') fans.push(hit('zimo'))
@@ -343,9 +373,19 @@ function scorePartition(ctx: ScoreContext, partition: WinPartition | null): FanH
   ].every((f) => ctx.flowers.includes(f as TileId))
   if (hasSeason && hasPlant) fans.push(hit('liangtaihua'))
 
-  if (isDuiPengWait(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('duipeng'))
-  if (isDuduWait(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('dudu'))
-  else if (isJiaDu(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('jiadu'))
+  // 對碰／假獨／獨獨：標準拆法；十六不搭亦可假獨（多面聽＋獨釣眼）
+  // 假獨優先於獨獨：獨聽型式但實際多面聽＝假獨，唔係真獨獨
+  if (partition) {
+    if (isDuiPengWait(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('duipeng'))
+    if (isJiaDu(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('jiadu'))
+    else if (isDuduWait(ctx.hand, ctx.melds, ctx.winTile)) fans.push(hit('dudu'))
+  } else if (
+    ctx.melds.length === 0 &&
+    isSixteenBuDa(ctx.hand, ctx.winTile) &&
+    isJiaDu(ctx.hand, ctx.melds, ctx.winTile)
+  ) {
+    fans.push(hit('jiadu'))
+  }
 
   const suits = suitsUsed(tilesNoFlower)
   const hasHonor = tilesNoFlower.some(isHonor)
@@ -400,7 +440,6 @@ function dedupeFans(fans: FanHit[]): FanHit[] {
     ['qimenqi', 'wumenqi'],
     ['quanqiuren', 'banqiuren'],
     ['qingyise', 'hunyise'],
-    ['menqing_ding', 'menqing_zimo', 'menqing'],
     ['dasixi', 'xiaosixi', 'dasifeng', 'xiaosifeng'],
     ['dasanyuan', 'xiaosanyuan'],
     ['wuanake', 'sianke', 'sananke', 'lianganke'],
@@ -411,7 +450,9 @@ function dedupeFans(fans: FanHit[]): FanHit[] {
     ['andansebbg', 'mingdansebbg'],
     ['ansansebbg', 'mingsansebbg'],
     ['anyisesitong', 'mingyisesitong', 'anyisesantong', 'mingyisesantong'],
-    ['anwuxiangfeng', 'mingwuxiangfeng', 'ansixiangfeng', 'mingsixiangfeng', 'ansanxiangfeng', 'mingsanxiangfeng'],
+    // 四五同順：明／暗只留一档（暗優先靠只 push 一條）
+    ['anwutongshun', 'mingwutongshun', 'ansitongshun', 'mingsitongshun'],
+    // 相逢：唔同 rank 組可並計（暗三相逢＋暗相逢）；同類 id 由 seen 去重
     ['dasanxiongdi', 'xiaosanxiongdi', 'liangxiongdi'],
     ['dasanseke', 'xiaosanseke'],
     ['xiaoyuwu', 'dayuwu', 'quewu'],
@@ -443,19 +484,47 @@ function dedupeFans(fans: FanHit[]): FanHit[] {
     qimenqi: ['wumenqi'],
     daji: ['duiduihu', 'wumenqi'],
     jijihu: ['duiduihu', 'menqing', 'menqing_zimo', 'zimo'],
-    // Ting：五暗刻已係對對結構，唔再計對對糊
-    wuanake: ['duiduihu'],
+    // 偏高檔：五暗坎同對對糊並計（片例）
     banqiuren: ['zimo'],
     haidilaoyue: ['zimo'],
-    shiliubuda: ['menqing', 'menqing_zimo', 'menqing_ding'],
-    queimen: ['wuzi'],
+    // 叮摸＝已叮兼自摸；天胡必然自摸
+    dingmo: ['zimo'],
+    tianhu: ['zimo'],
+    // 十六不搭：門清型特殊牌；散張易齊五／七門，唔另計門齊
+    shiliubuda: [
+      'menqing',
+      'menqing_zimo',
+      'menqing_ding',
+      'wumenqi',
+      'qimenqi',
+    ],
+    // 缺一門同無字可並計（偏高檔）
     qingyise: ['hunyise', 'queimen', 'wuzi'],
-    ziyise: ['hunyise', 'qingyise', 'queimen'],
-    menqing_ding: ['ding', 'menqing', 'menqing_zimo'],
-    menqing_zimo: ['menqing'],
-    // 小於五／大於五已含缺五
+    // 字一色：吞混么九／對對／滿庭芳系；字牌刻番已含喺大牌型（對照偏高檔片）
+    ziyise: [
+      'hunyise',
+      'qingyise',
+      'queimen',
+      'hunlaotou',
+      'hundaiyao',
+      'duiduihu',
+      'hunmantingfang',
+      'mantingfang',
+      'fengke',
+      'sanyuanpai',
+    ],
+    // 四喜／三元大牌已計結構，唔再拆風／三元每組
+    dasixi: ['fengke', 'dasifeng', 'xiaosifeng', 'xiaosixi'],
+    xiaosixi: ['fengke', 'dasifeng', 'xiaosifeng'],
+    dasanyuan: ['sanyuanpai', 'xiaosanyuan'],
+    xiaosanyuan: ['sanyuanpai'],
+    menqing_ding: ['ding', 'menqing', 'menqing_zimo', 'zimo'],
+    menqing_zimo: ['zimo'],
+    // 小於五／大於五／混么九／清老頭已必然缺五
     xiaoyuwu: ['quewu'],
     dayuwu: ['quewu'],
+    hunlaotou: ['quewu', 'hundaiyao', 'quandaiyao'],
+    qinglaotou: ['quewu', 'hunlaotou', 'hundaiyao', 'quandaiyao'],
     // 五槓子已包各槓入番
     wugangzi: ['minggang', 'angang'],
     // 清龍＝123+456+789；步步高＝123+234+345（唔同牌型）；防舊誤計吞步步高
@@ -478,8 +547,10 @@ function dedupeFans(fans: FanHit[]): FanHit[] {
 
   for (const f of fans) {
     if (blocked.has(f.id)) continue
-    if (seen.has(f.id)) continue
-    seen.add(f.id)
+    // instance：同一番種可並列多條（如混滿庭芳·7／·8）
+    const key = f.instance ? `${f.id}:${f.instance}` : f.id
+    if (seen.has(key)) continue
+    seen.add(key)
     out.push(f)
   }
   return out
@@ -495,7 +566,7 @@ function withDefaults(ctx: ScoreContext): ScoreContext {
     zhengHuaTiles: ctx.zhengHuaTiles ?? [],
     fiveTongShunFan: ctx.fiveTongShunFan ?? 40,
     excludeBanGaoXiangFengAfterWuTong:
-      ctx.excludeBanGaoXiangFengAfterWuTong ?? true,
+      ctx.excludeBanGaoXiangFengAfterWuTong ?? false,
     flowerDrawChain: ctx.flowerDrawChain ?? 0,
     kongDrawChain: ctx.kongDrawChain ?? 0,
     visibleWinTileCount: ctx.visibleWinTileCount ?? 0,
@@ -505,34 +576,106 @@ function withDefaults(ctx: ScoreContext): ScoreContext {
 }
 
 /**
+ * 雙食時只屬「一局／一次糊」嘅偶然・糊法・條件番：兩舖唔疊加。
+ * 型類（清一色、般高等）可按舖重計。
+ */
+const SHUANGSHI_ONCE_IDS: ReadonlySet<string> = new Set([
+  'menqing',
+  'menqing_zimo',
+  'menqing_ding',
+  'ding',
+  'dingmo',
+  'tianting',
+  'diting',
+  'ippatsu',
+  'zimo',
+  'qianggang',
+  'huamo',
+  'gangmo',
+  'jinshangtianhua',
+  'mingjue',
+  'juejue',
+  'tianhu',
+  'dihu',
+  'renhu',
+  'sizinnei',
+  'qizinnei',
+  'shizinnei',
+  'wuzihua',
+  'wuzi',
+  'wuhua',
+  'zhenghua',
+  'lanhua',
+  'qizhihua',
+  'liuhuabuzheng',
+  'liangtaihua',
+  'duipeng',
+  'dudu',
+  'jiadu',
+  'haidilaoyue',
+  'hedilaoyu',
+  'quanqiuren',
+  'banqiuren',
+  'shuangxiang',
+  'sanxiang',
+  'fanxue',
+  'dealer',
+  'lianzhuang',
+])
+
+/**
+ * 雙食合併：
+ * - 偶然／糊法／花／莊等（ONCE）→ 無 shop，UI 放最頂共用行（唔重計、唔掛某舖）
+ * - 型類 → 嚦咕舖／標準舖可重計
+ */
+function mergeShuangshi(nico: FanHit[], standard: FanHit[]): FanHit[] {
+  const shared = standard
+    .filter((f) => SHUANGSHI_ONCE_IDS.has(f.id))
+    .map(({ shop: _s, ...f }) => f)
+  const nicoPat = nico
+    .filter((f) => !SHUANGSHI_ONCE_IDS.has(f.id))
+    .map((f) => ({ ...f, shop: 'liguligu' as const }))
+  const stdPat = standard
+    .filter((f) => !SHUANGSHI_ONCE_IDS.has(f.id))
+    .map((f) => ({ ...f, shop: 'standard' as const }))
+  return [...shared, ...nicoPat, ...stdPat]
+}
+
+/**
  * 計算食糊番種。標準型會試所有拆法，取總番最高。
+ * 嚦咕＋標準同時成立＝雙食：型類可重計（如清一色×2）；偶然／糊法番只計一次。
  */
 export function calculateFans(partial: ScoreContext): FanHit[] {
   const ctx = withDefaults(partial)
   if (ctx.melds.length === 0 && isThirteenOrphans(ctx.hand, ctx.winTile)) {
     return scorePartition(ctx, null)
   }
-  if (ctx.melds.length === 0 && isLiguligu(ctx.hand, ctx.winTile)) {
-    return scorePartition(ctx, null)
-  }
   if (ctx.melds.length === 0 && isSixteenBuDa(ctx.hand, ctx.winTile)) {
     return scorePartition(ctx, null)
   }
 
+  const nico =
+    ctx.melds.length === 0 && isLiguligu(ctx.hand, ctx.winTile)
   const parts = findStandardWins(ctx.hand, ctx.melds, ctx.winTile)
-  if (parts.length === 0) return scorePartition(ctx, null)
 
-  let best: FanHit[] = []
+  let bestStandard: FanHit[] = []
   let bestTotal = -1
   for (const p of parts) {
     const scored = scorePartition(ctx, p)
     const total = scored.reduce((s, f) => s + f.value, 0)
     if (total > bestTotal) {
       bestTotal = total
-      best = scored
+      bestStandard = scored
     }
   }
-  return best
+
+  if (nico && bestStandard.length > 0) {
+    return mergeShuangshi(scorePartition(ctx, null), bestStandard)
+  }
+  if (nico) return scorePartition(ctx, null)
+  // 未成任何合法型（標準／特殊）→ 唔計清一色等「假糊」番
+  if (parts.length === 0) return []
+  return bestStandard
 }
 
 /** 同 calculateFans：取總番最高嘅標準拆法（高亮用，避免 parts[0] 同計番唔一致） */

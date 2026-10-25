@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Seat } from '../engine'
+import { loadInstantToast } from './extraPrefs'
+import { isNotifyQuietNow } from './leftoverPrefs'
 
 const WIND = ['東', '南', '西', '北'] as const
 
@@ -21,6 +23,11 @@ export function InstantToast({ payouts, names }: InstantToastProps) {
   const seen = useRef(0)
 
   useEffect(() => {
+    if (!loadInstantToast() || isNotifyQuietNow()) {
+      seen.current = payouts.length
+      setBanner(null)
+      return
+    }
     if (payouts.length <= seen.current) {
       seen.current = Math.min(seen.current, payouts.length)
       return

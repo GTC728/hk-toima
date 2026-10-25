@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<title>香港台麻 · 開枱</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #312e2b; color: #fff; font-family: "Noto Sans TC", "Segoe UI", sans-serif; }
+  body { display: grid; grid-template-columns: 104px 1fr 332px; min-height: 100vh; }
+  .side { background: #262421; display: flex; flex-direction: column; padding: 10px 8px 8px; }
+  .brand { display: grid; justify-items: center; gap: 4px; padding: 4px 0 14px; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; }
+  .mark { width: 26px; height: 34px; background: #f4efe4; color: #c0392b; border-radius: 3px; display: grid; place-items: center; font-size: 14px; box-shadow: inset 0 0 0 1px #e6dcc8; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav button { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%; border: 0; background: transparent; color: #a8a29e; padding: 8px 4px; border-radius: 10px; font: 500 11px "Noto Sans TC", sans-serif; }
+  .nav button.on { background: #3d3a36; color: #fff; }
+  .nav svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .grow { flex: 1; }
+  .me { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; color: #d6d3d1; font-size: 12px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: #4a4744; display: grid; place-items: center; font-size: 13px; }
+  .rate { background: #3d3a36; color: #f5c451; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+  .stage { display: grid; place-items: center; padding: 18px 8px; }
+  .board-wrap { width: min(78vh, 680px); }
+  .who { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 14px; }
+  .who .avatar { width: 26px; height: 26px; font-size: 12px; }
+  .frame { display: grid; grid-template-columns: 18px 1fr 18px; grid-template-rows: 18px 1fr 18px; }
+  .coord { display: grid; place-items: center; color: #a8a29e; font-size: 11px; letter-spacing: 0.2em; }
+  .board {
+    aspect-ratio: 1;
+    background: #127a52;
+    border: 7px solid #6b4a2a;
+    box-shadow: 0 16px 36px rgba(0,0,0,.5);
+    padding: 10px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+  }
+  .wall { display: flex; justify-content: center; gap: 3px; flex-wrap: wrap; }
+  .hands { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 3px; }
+  .tile { width: 34px; height: 46px; background: linear-gradient(#fffdf8, #f3ead8); border-radius: 2px; box-shadow: 0 1px 0 #0004, inset 0 0 0 1px #e7dcc6; display: grid; place-items: center; color: #1c1410; font-weight: 700; font-size: 12px; }
+  .tile.r { color: #c0392b; }
+  .tile.b { color: #1d4e89; }
+  .tile.g { color: #1d7a3a; }
+  .tile.back { background: #1a6b45; box-shadow: inset 0 0 0 2px #0e4a30, inset 0 0 0 4px #f4efe4; color: transparent; }
+  .center { display: grid; place-items: center; gap: 8px; }
+  .dice { display: flex; gap: 6px; }
+  .die { width: 28px; height: 28px; border-radius: 4px; background: #f4efe4; color: #1c1410; display: grid; place-items: center; font-weight: 700; }
+  .round { color: rgba(244,239,228,.8); letter-spacing: 0.35em; font-size: 13px; }
+  .play { padding: 20px 16px 14px; }
+  .play h1 { margin: 2px 4px 14px; font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .play h1 svg { width: 22px; height: 22px; }
+  .mode { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: #3c3936; color: #fff; border: 0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .mode b { display: block; font-size: 15px; font-weight: 700; }
+  .mode small { display: block; color: #a8a29e; font-size: 12px; font-weight: 400; margin-top: 2px; }
+  .ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .ico svg { width: 18px; height: 18px; }
+  .y { background: #f5c451; color: #1c1410; }
+  .bl { background: #7eb6ff; color: #10233f; }
+  .gn { background: #81b64c; color: #14210c; }
+  .pk { background: #f0a3c2; color: #3a1424; }
+  .foot { display: flex; gap: 18px; margin: 8px 4px 0; color: #d6d3d1; font-size: 13px; }
+  .foot span { display: inline-flex; align-items: center; gap: 6px; }
+  .foot svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+</style>
+</head>
+<body>
+  <aside class="side">
+    <div class="brand"><span class="mark">萬</span>台麻</div>
+    <nav class="nav">
+      <button class="on" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>開枱</button>
+      <button type="button"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM5 10h14M10 5v14"/></svg>番數表</button>
+      <button type="button"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h5"/></svg>計番機</button>
+      <button type="button"><svg viewBox="0 0 24 24"><path d="M5 7h14v12H5zM5 7l2-3h10l2 3M9 12h6"/></svg>拉數簿</button>
+      <button type="button"><svg viewBox="0 0 24 24"><path d="M4 19V6l8-3 8 3v13l-8 3-8-3z"/><path d="M12 3v16"/></svg>學打牌</button>
+      <button type="button"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>戰績</button>
+      <button type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 19c1.5-3 3.8-4.5 7-4.5S17.5 16 19 19"/></svg>個人</button>
+    </nav>
+    <div class="grow"></div>
+    <div class="me"><span class="avatar">東</span>玩家<span class="rate">東家</span></div>
+  </aside>
+
+  <section class="stage">
+    <div class="board-wrap">
+      <p class="who"><span class="avatar">東</span> 未開門</p>
+      <div class="frame">
+        <span></span><span class="coord">北</span><span></span>
+        <span class="coord">西</span>
+        <div class="board">
+          <div class="wall">
+            <div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile r">九萬</div><div class="tile b">五筒</div><div class="tile g">三索</div>
+          </div>
+          <div class="hands">
+            <div class="col">
+              <div class="tile">南</div><div class="tile">西</div><div class="tile">北</div><div class="tile r">中</div>
+            </div>
+            <div class="center">
+              <div class="dice"><span class="die">3</span><span class="die">5</span><span class="die">2</span></div>
+              <div class="round">東圈</div>
+            </div>
+            <div class="col">
+              <div class="tile g">發</div><div class="tile">白</div><div class="tile r">一萬</div><div class="tile b">九筒</div>
+            </div>
+          </div>
+          <div class="wall">
+            <div class="tile r">一萬</div><div class="tile r">二萬</div><div class="tile r">三萬</div><div class="tile b">一筒</div><div class="tile b">二筒</div><div class="tile g">一索</div><div class="tile g">二索</div><div class="tile">東</div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div><div class="tile back"></div>
+          </div>
+        </div>
+        <span class="coord">東</span>
+        <span></span><span class="coord">南</span><span></span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="play">
+    <h1>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f5c451" stroke-width="1.7"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      開枱
+    </h1>
+    <button class="mode" type="button"><span class="ico y"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 7h16v11H4zM7 7V5h10v2"/></svg></span><span><b>開一間房</b><small>產生房碼，朋友用這個網頁入來</small></span></button>
+    <button class="mode" type="button"><span class="ico bl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M13 6l6 6-6 6"/></svg></span><span><b>入朋友的房</b><small>輸入六位房碼，或重連上次</small></span></button>
+    <button class="mode" type="button"><span class="ico gn"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="9" r="2.2"/><circle cx="16" cy="9" r="2.2"/><path d="M4 18c.8-2.4 2.4-3.6 4.2-3.6S11.4 15.6 12 18c.6-2.4 2.2-3.6 3.8-3.6S19.2 15.6 20 18"/></svg></span><span><b>這部機開枱</b><small>輪流打，空位交 AI</small></span></button>
+    <button class="mode" type="button"><span class="ico pk"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3"/><path d="M6 19c1-3 3-4.5 6-4.5s5 1.5 6 4.5"/></svg></span><span><b>和 AI 打</b><small>你坐東，其餘三家是穩陣、進攻、搏糊</small></span></button>
+    <div class="foot">
+      <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg>對局紀錄</span>
+      <span><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>枱規</span>
+    </div>
+  </aside>
+</body>
+</html>

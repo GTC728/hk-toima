@@ -1,0 +1,120 @@
+/* 香港台麻 HK ToiMA — local table UI */
+
+:root {
+  --felt: #1a5c45;
+  --felt-deep: #0f3d2e;
+  --felt-light: #2a7a5c;
+  --wood: #6b4423;
+  --wood-light: #8b5e3c;
+  --wood-dark: #3d2412;
+  --ivory: #f4efe4;
+  --ivory-edge: #d4cbb8;
+  --ink: #1c1410;
+  --ink-soft: #4a3b32;
+  --cream: #f3ead8;
+  --gold: #c4a35a;
+  --danger: #b33a2b;
+  /* 網站外殼（設定 → 介面 → 網站配色；一鍵覆寫） */
+  --shell-bg: #312e2b;
+  --shell-panel: #262421;
+  --shell-card: #1f1d1b;
+  --shell-elevated: #3c3936;
+  --shell-hover: #4a4744;
+  --shell-line: #4a4642;
+  --shell-text: #f6f1e6;
+  --shell-muted: #c8c4bf;
+  --shell-focus: #d7e7b8;
+  --shell-faint: color-mix(in srgb, var(--shell-text) 7%, transparent);
+  --accent: #81b64c;
+  --accent-ink: #14210c;
+  --tile-man: #b91c1c;
+  --tile-pin: #1d4e89;
+  --tile-sou: #1f6b3a;
+  --tile-honor: #1c1410;
+  --tile-flower-red: #c41e3a;
+  --tile-flower-green: #1a7a3a;
+  /* 三種牌 size：sm=牌桌 · md=結算 · lg=自己手牌 */
+  --tile-sm-w: 1.55rem;
+  --tile-sm-h: 2.05rem;
+  --tile-md-w: 2.15rem;
+  --tile-md-h: 2.85rem;
+  --tile-lg-w: clamp(2rem, 6.3vw, 3.2rem);
+  --tile-lg-h: clamp(2.7rem, 8.4vw, 4.3rem);
+  --shadow: rgba(12, 28, 20, 0.45);
+  --font-display: "Noto Serif TC", "Source Han Serif TC", "Songti TC", serif;
+  --font-ui: "Noto Sans TC", "PingFang HK", "Microsoft JhengHei", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  color: var(--shell-text);
+  background: var(--shell-bg);
+  caret-color: var(--accent);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+button {
+  font-family: inherit;
+}
+
+/*
+ * 整站一次對齊：舊頁面用 --cream／--gold 當「深底淺字」。
+ * 外殼配色之後改跟 --shell-*；牌面／枱面再鎖返原本象牙色，唔好花牌。
+ */
+.desk,
+.fan-page,
+.settings-page,
+.labook,
+.you-page,
+.stats-page,
+.tutorial,
+.online-lobby,
+.room-side,
+.gate__card,
+.home {
+  --cream: var(--shell-text);
+  --gold: var(--accent);
+  --ink-soft: var(--shell-muted);
+}
+
+.table,
+.tile,
+.tile-face,
+.meld,
+.settlement .tile,
+.settlement .meld {
+  --cream: #f3ead8;
+  --gold: #c4a35a;
+  --ink: #1c1410;
+  --ink-soft: #4a3b32;
+  --ivory: #f4efe4;
+  --ivory-edge: #d4cbb8;
+}
+
+/* 一鍵配色：日間 mood */
+html[data-palette-mood='light'] body {
+  color: var(--shell-text);
+  background: var(--shell-bg);
+}
+
+html[data-palette-mood='light'] .desk--page .fan-page,
+html[data-palette-mood='light'] .desk--page .settings-page,
+html[data-palette-mood='light'] .desk--page .you-page,
+html[data-palette-mood='light'] .desk--page .labook,
+html[data-palette-mood='light'] .desk--page .stats-page,
+html[data-palette-mood='light'] .desk--page .tutorial {
+  background: var(--shell-panel);
+  color: var(--shell-text);
+}

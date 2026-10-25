@@ -1,0 +1,1016 @@
+/* ——— Settlement ——— */
+
+.settlement {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(ellipse at 50% 0%, #3d2412, #1a1008 60%);
+}
+
+.settlement__panel {
+  width: min(560px, 100%);
+  max-height: min(94vh, 860px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1.35rem 1.2rem 1.5rem;
+  background: var(--cream);
+  border: 2px solid var(--wood);
+  border-radius: 4px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.settlement__header {
+  margin-bottom: 0.85rem;
+  flex-shrink: 0;
+}
+
+.settlement__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--wood-dark);
+}
+
+.settlement__ranked {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
+.settlement__meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* 1×4：四家各佔一整行，牌才排得落一條 */
+.settlement__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  flex: 0 0 auto;
+}
+
+.settlement__seat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.75rem 0.75rem;
+  border: 1px solid rgba(107, 68, 35, 0.22);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settlement__seat.is-you {
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.settlement__seat.is-winner {
+  border-color: rgba(45, 106, 79, 0.45);
+  border-left: 4px solid var(--felt);
+  background: rgba(45, 106, 79, 0.07);
+}
+
+.settlement__seat.is-open {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+/* 平板以上：2×2 鋪滿闊度，唔再中間一條窄欄 */
+@media (min-width: 720px) {
+  .settlement {
+    align-items: start;
+    justify-items: center;
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+
+  .settlement__panel {
+    width: min(1100px, 100%);
+    max-height: min(96vh, 1100px);
+    padding: 1.4rem 1.45rem 1.55rem;
+  }
+
+  .settlement__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .settlement__meta {
+    margin: 0;
+    text-align: right;
+  }
+
+  .settlement__stack {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 960px) {
+  .settlement__panel {
+    width: min(1280px, 100%);
+    padding: 1.45rem 1.6rem 1.65rem;
+  }
+
+  .settlement__stack {
+    gap: 0.85rem;
+  }
+}
+
+.settlement__seat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.settlement__seat-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.4rem;
+  font-size: 0.95rem;
+}
+
+.settlement__seat-who em {
+  font-style: normal;
+  font-size: 0.68rem;
+  padding: 0.08rem 0.32rem;
+  border-radius: 2px;
+  background: rgba(107, 68, 35, 0.12);
+  color: var(--wood-dark);
+}
+
+.settlement__seat-who .tag-you {
+  background: rgba(212, 175, 55, 0.35);
+}
+
+.settlement__seat-who .tag-win {
+  background: rgba(45, 106, 79, 0.2);
+  color: var(--felt);
+}
+
+.settlement__seat-nets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.settlement__seat-cash-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.settlement__seat-net {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  line-height: 1.15;
+}
+
+.settlement__net-label {
+  display: block;
+  font-family: var(--font-body, sans-serif);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  opacity: 0.75;
+}
+
+.settlement__seat-net.is-plus {
+  color: #1f6b45;
+}
+
+.settlement__seat-net.is-minus {
+  color: var(--danger);
+}
+
+.settlement__seat-net--cash {
+  font-size: 1.05rem;
+  padding-bottom: 0.05rem;
+}
+
+.settlement__seat-net--pool {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.settlement__la-tag {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.05rem 0.28rem;
+  border-radius: 2px;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgba(107, 68, 35, 0.12);
+  color: var(--wood-dark);
+}
+
+.settlement__la-tag--settle {
+  background: rgba(45, 106, 79, 0.18);
+  color: var(--felt);
+}
+
+.settlement__seat-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.settlement__seat-sub {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.settlement__seat-sub--mute {
+  opacity: 0.65;
+}
+
+.settlement__fan-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid rgba(45, 106, 79, 0.35);
+  border-radius: 3px;
+  background: rgba(45, 106, 79, 0.1);
+  color: var(--felt);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settlement__fan-chip-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.settlement__seat-la,
+.settlement__seat-instant {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.settlement__seat-la li,
+.settlement__seat-instant li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  color: var(--ink-soft);
+}
+
+.settlement__seat-la .is-owe {
+  color: var(--danger);
+}
+
+.settlement__seat-la .is-owed {
+  color: #1f6b45;
+}
+
+.settlement__seat-tiles {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.55rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.settlement__seat-tiles .meld-group,
+.settlement__flowers {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.35rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.settlement__seat-tiles.has-melds {
+  --meld-cap: 0.85rem;
+}
+
+/* 有明牌時，手牌／花／糊牌留同等底空，令牌底線齊 */
+.settlement__seat-tiles.has-melds > .settlement__flowers,
+.settlement__seat-tiles.has-melds > .settlement__hand-main,
+.settlement__seat-tiles.has-melds > .settlement__win-slot {
+  padding-bottom: var(--meld-cap);
+}
+
+.settlement .meld--cap {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.settlement .meld__tiles {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.settlement .meld__caption {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  height: var(--meld-cap);
+  padding-top: 0.12rem;
+  font-size: 0.62rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+/* 結算牌：展開／收起／四家統一 md，唔跟手牌 lg 或牌桌 sm */
+.settlement .tile,
+.settlement .tile--sm,
+.settlement .tile--md,
+.settlement .tile--lg {
+  width: var(--tile-md-w) !important;
+  height: var(--tile-md-h) !important;
+  font-size: calc(var(--tile-md-w) * 0.48) !important;
+}
+
+.settlement .tile--selected {
+  transform: none;
+}
+
+.settlement__la-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.settlement__win-detail {
+  margin-top: 0.55rem;
+  padding: 0.65rem 0.55rem;
+  border-radius: 4px;
+  background: rgba(107, 68, 35, 0.06);
+}
+
+.settlement__hand-main {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.settlement__win-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  padding: 0.2rem 0.3rem 0.15rem;
+  border-radius: 4px;
+  background: rgba(107, 68, 35, 0.08);
+  border: 1px dashed rgba(107, 68, 35, 0.28);
+}
+
+.settlement__win-slot-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+.settlement__hl-hint {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.settlement__fans {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@media (min-width: 720px) {
+  .settlement__fans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 0.45rem;
+  }
+}
+
+.settlement__fan-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.settlement__fan-btn.is-active {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.settlement__fan-shop {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.settlement__fan-btn.is-shop-liguligu.is-active {
+  border-color: #b8922e;
+  background: rgba(212, 175, 55, 0.28);
+}
+
+.settlement__fan-btn.is-shop-standard.is-active {
+  border-color: #5a9a3a;
+  background: rgba(129, 182, 76, 0.22);
+}
+
+.settlement__hand-main[data-hl-shop='liguligu'] .tile--selected,
+.settlement__hand-main[data-hl-shop='liguligu'] .tile--focus {
+  box-shadow: 0 0 0 2px rgba(184, 146, 46, 0.95);
+}
+
+.settlement__hand-main[data-hl-shop='standard'] .tile--selected,
+.settlement__hand-main[data-hl-shop='standard'] .tile--focus {
+  box-shadow: 0 0 0 2px rgba(90, 154, 58, 0.95);
+}
+
+.settlement__fan-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.settlement__fan-times {
+  font-style: normal;
+  font-size: 0.75em;
+  font-weight: 500;
+  color: #8a7a6e;
+  flex-shrink: 0;
+}
+
+.settlement__fan-name,
+.settlement__fan-value {
+  color: var(--ink-soft);
+}
+
+.settlement__fans,
+.settlement__pays,
+.settlement__la,
+.settlement__block ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+}
+
+.settlement__block {
+  margin: 1rem 0;
+}
+
+.settlement__block h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-family: var(--font-display);
+}
+
+.settlement__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.settlement__la li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.settlement__la em {
+  font-style: normal;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+}
+
+.settlement__mini {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--wood);
+  background: transparent;
+  border-radius: 2px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--wood-dark);
+}
+
+.settlement__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.settlement__next {
+  width: auto;
+  min-width: 6.5rem;
+  padding: 0.7rem 1.4rem;
+  border: none;
+  border-radius: 2px;
+  background: var(--felt);
+  color: var(--cream);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settlement__leave {
+  width: auto;
+  padding: 0.7rem 0.4rem;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.settlement__replay {
+  width: auto;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid var(--wood);
+  border-radius: 2px;
+  background: rgba(107, 68, 35, 0.08);
+  color: var(--wood-dark);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ——— Replay ——— */
+
+.replay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(12, 28, 22, 0.72);
+}
+
+.replay__panel {
+  width: min(520px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  padding: 1.15rem 1.1rem 1.25rem;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 4px;
+  border: 1px solid rgba(107, 68, 35, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.replay__panel--wide {
+  width: min(920px, 100%);
+}
+
+.replay__panel--table {
+  width: min(1100px, 98vw);
+  max-height: min(96vh, 900px);
+  display: flex;
+  flex-direction: column;
+}
+
+.replay__body {
+  display: grid;
+  grid-template-columns: 1fr minmax(11rem, 15rem);
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.replay__body--table {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(10.5rem, 14rem);
+  align-items: stretch;
+}
+
+.replay__felt-wrap {
+  min-height: min(58vh, 520px);
+  max-height: min(68vh, 640px);
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid rgba(107, 68, 35, 0.2);
+  background: #1a3d32;
+}
+
+.replay__felt-wrap .replay-table.table {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.replay__felt-wrap .table__hud {
+  flex-shrink: 0;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.replay__felt-wrap .table__felt {
+  flex: 1;
+  min-height: 0;
+  /* 彈層內略細牌，四家同屏 */
+  --tile-sm-w: clamp(1.05rem, 2.2vh, 1.55rem);
+  --tile-sm-h: clamp(1.35rem, 2.9vh, 2.05rem);
+  --tile-md-w: clamp(1.25rem, 2.6vh, 1.85rem);
+  --tile-md-h: clamp(1.65rem, 3.5vh, 2.45rem);
+  --tile-lg-w: clamp(1.45rem, 3.2vh, 2.2rem);
+  --tile-lg-h: clamp(1.9rem, 4.2vh, 2.95rem);
+}
+
+.replay-table__side-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  align-items: center;
+}
+
+.replay-table__side-hand--left .tile,
+.replay-table__side-hand--right .tile {
+  transform-origin: center;
+}
+
+.replay-table__step {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--cream);
+  opacity: 0.9;
+  text-align: center;
+  max-width: 8rem;
+}
+
+@media (max-width: 720px) {
+  .replay__body,
+  .replay__body--table {
+    grid-template-columns: 1fr;
+  }
+
+  .replay__felt-wrap {
+    min-height: 42vh;
+  }
+}
+
+.replay__plies h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--wood-dark);
+}
+
+.replay__ply-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(52vh, 420px);
+  overflow: auto;
+  border: 1px solid rgba(107, 68, 35, 0.18);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.replay__ply {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-bottom: 1px solid rgba(107, 68, 35, 0.1);
+  background: transparent;
+  text-align: left;
+  font-size: 0.78rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.replay__ply em {
+  font-style: normal;
+  color: var(--felt-deep);
+  font-weight: 600;
+}
+
+.replay__ply.is-on {
+  background: color-mix(in srgb, var(--felt) 18%, transparent);
+}
+
+.replay__melds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.replay__meld {
+  display: inline-flex;
+  gap: 0.15rem;
+  padding: 0.1rem;
+  border: 1px solid rgba(107, 68, 35, 0.2);
+  border-radius: 2px;
+}
+
+.replay__header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--wood-dark);
+}
+
+.replay__header p {
+  margin: 0.25rem 0 0.85rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.replay__table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.replay__seat {
+  padding: 0.55rem 0.5rem;
+  border: 1px solid rgba(107, 68, 35, 0.18);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.replay__seat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.replay__seat-head span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.replay__hand,
+.replay__discards,
+.replay__backs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.replay__back {
+  width: 1.35rem;
+  height: 1.85rem;
+  border-radius: 2px;
+  background: linear-gradient(145deg, #2a6b52, #1a4a38);
+  border: 1px solid #0f3d2e;
+}
+
+.replay__meta {
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.replay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.replay__btn {
+  flex: 1;
+  min-width: 5rem;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 2px;
+  background: var(--felt);
+  color: var(--cream);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.replay__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.replay__btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(107, 68, 35, 0.35);
+  color: var(--wood-dark);
+  font-weight: 500;
+}
+
+.replay__btn--armed {
+  background: #3c3936;
+  color: #fff;
+}
+
+.settlement {
+  background: var(--shell-bg, var(--shell-bg));
+  color: var(--shell-text, #f6f1e6);
+}
+
+.settlement__panel,
+.replay__panel {
+  background: var(--shell-panel, var(--shell-panel));
+  color: var(--shell-text, #f6f1e6);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.settlement__title,
+.replay__header h2 {
+  color: #fff;
+  font-family: var(--font-ui);
+}
+
+.settlement__meta,
+.settlement__leave,
+.replay__meta {
+  color: #e7e1d8;
+}
+
+.settlement__seat {
+  background: #2a2826;
+  border-color: #3c3936;
+  color: #f6f1e6;
+}
+
+.settlement__seat.is-you {
+  background: #32302c;
+  border-color: var(--accent);
+}
+
+.settlement__seat.is-winner {
+  background: #2a3830;
+  border-color: var(--accent);
+  border-left: 4px solid var(--accent);
+}
+
+/* 暗底：覆寫淺色主題嘅深色字／深綠 */
+.settlement__seat-who em {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e7e1d8;
+}
+
+.settlement__seat-who .tag-you {
+  background: rgba(129, 182, 76, 0.28);
+  color: #d8f0b8;
+}
+
+.settlement__seat-who .tag-win {
+  background: rgba(129, 182, 76, 0.35);
+  color: #c8f0a0;
+}
+
+.settlement__seat-net,
+.settlement__net-label,
+.settlement__seat-sub,
+.settlement__fan-chip-hint,
+.settlement__seat-la li,
+.settlement__seat-instant li {
+  color: #c8c4bf;
+}
+
+.settlement__seat-net.is-plus {
+  color: #9fd46a;
+}
+
+.settlement__seat-net.is-minus {
+  color: #ff9b8a;
+}
+
+.settlement__seat-net--pool {
+  color: #e7e1d8;
+  opacity: 1;
+}
+
+.settlement__fan-chip {
+  border-color: rgba(129, 182, 76, 0.45);
+  background: rgba(129, 182, 76, 0.14);
+  color: #e8f5d4;
+}
+
+.settlement__fan-chip-hint {
+  color: #b8d99a;
+}
+
+.settlement__la-tag {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e7e1d8;
+}
+
+.settlement__la-tag--settle {
+  background: rgba(129, 182, 76, 0.28);
+  color: #c8f0a0;
+}
+
+.settlement__seat-la .is-owe {
+  color: #ff9b8a;
+}
+
+.settlement__seat-la .is-owed {
+  color: #9fd46a;
+}
+
+.settlement__hl-hint,
+.settlement__win-slot-label {
+  color: #c8c4bf;
+}
+
+.settlement__replay,
+.replay__btn--ghost {
+  background: #3c3936;
+  color: #f6f1e6;
+  border: none;
+  border-radius: 8px;
+}
+
+.settlement__next,
+.replay__btn {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+}
+
+/* 局終摘要關：只留分數行，唔展開手牌／番種 */
+.settlement--compact .settlement__seat-tiles,
+.settlement--compact .settlement__fans,
+.settlement--compact .settlement__fan-chip,
+.settlement--compact .settlement__fan-chip-hint {
+  display: none;
+}
+
+.settlement--compact .settlement__seat {
+  padding-block: 0.55rem;
+}
+

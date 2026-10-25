@@ -6,21 +6,28 @@
  * ── HTTP ──────────────────────────────────────────────────────────
  * POST /api/rooms
  *   body: { name?: string }
+ *   有工作階段 cookie 先在座位記低 playerId；無 cookie 一樣開得房。
  *   → { code, seat, seatToken, wsPath }
  *
  * POST /api/rooms/:code/join
  *   body: { name?: string, seat?: 0|1|2|3, seatToken?: string }
  *   seatToken → reconnect that seat; else claim empty seat (optional preference)
+ *   重連唔改緊打嗰席嘅名。出牌權限仍然只對 seatToken。
  *   → { code, seat, seatToken, wsPath }
  *
  * GET  /api/rooms/:code          → lobby snapshot (no private hands)
  * GET  /api/rooms/:code/ws?seat=&token=  → WebSocket upgrade
  * GET  /api/health
  *
+ * POST /api/match/join   { mode: 'casual'|'ranked', name, fillAiAfterSec?, rules? }
+ * GET  /api/match/status?ticketId=&mode=
+ * POST /api/match/leave  { ticketId, mode? }
+ *
  * ── Client → Server (WS JSON) ─────────────────────────────────────
  * { type: 'ping' }
  * { type: 'setName', name: string }
  * { type: 'setSeatKind', seat: Seat, kind: 'empty' | 'ai' }   // host; empty↔AI only
+ * { type: 'setAiPersona', seat: Seat, persona: 'steady' | 'attack' | 'gamble' }
  * { type: 'fillAi' }                                         // host: empty → AI
  * { type: 'setRules', rules: Partial<TableRules> }           // host: live sync before start
  * { type: 'start', seed?: number, rules?: Partial<TableRules>, fillAi?: boolean }
@@ -39,6 +46,7 @@
 
 import type {
   Action,
+  AiPersona,
   PrivateGameView,
   PublicGameView,
   Seat,
@@ -52,6 +60,8 @@ export interface SeatInfo {
   name: string
   kind: SeatKind
   connected: boolean
+  /** AI 性格。舊房冇呢個欄時客戶端當進攻。 */
+  persona: AiPersona
 }
 
 export interface RoomSnapshot {
@@ -74,6 +84,7 @@ export type ClientMessage =
   | { type: 'ping' }
   | { type: 'setName'; name: string }
   | { type: 'setSeatKind'; seat: Seat; kind: 'empty' | 'ai' }
+  | { type: 'setAiPersona'; seat: Seat; persona: AiPersona }
   | { type: 'fillAi' }
   | { type: 'setRules'; rules: Partial<TableRules> }
   | {

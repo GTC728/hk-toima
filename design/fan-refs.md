@@ -30,10 +30,10 @@
 ## 預設枱規對應
 
 - `fiveTongShunFan: 40`
-- `excludeBanGaoXiangFengAfterWuTong: true`
+- `excludeBanGaoXiangFengAfterWuTong: false`（仍另計般高／相逢；開 true 跟舊坊間吞組件）
 - 明／暗分档（般高、相逢、龍、四歸等）跟麻雀數簿常見枱表
 
-協會 2025（五同順 60、另加般高相逢）可用枱規改，**唔係**開枱預設。
+舊坊間（計四五同順後唔再計般高相逢）開 `excludeBanGaoXiangFengAfterWuTong: true`；預設跟協會另加。
 
 ---
 

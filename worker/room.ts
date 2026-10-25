@@ -3,21 +3,25 @@
  * Runs shared engine; WebSocket hibernation for clients.
  */
 import {
-  applyAction,
+  afterPlayerAction,
   autoPassImpossibleClaims,
   chooseAiAction,
   createGame,
   deadlineFromOpened,
   DEFAULT_RULES,
-  getLegalActions,
   getPrivateView,
   getPublicView,
+  aiThinkMs,
+  displayPersonas,
+  isAiPersona,
   timeoutPlayAction,
   type Action,
+  type AiPersona,
   type GameState,
   type Seat,
   type TableRules,
 } from '../src/engine'
+import { aiClaimSeats, rejectHumanAction } from './claim-gate'
 import type {
   ClientMessage,
   RoomSnapshot,
@@ -26,10 +30,15 @@ import type {
   ServerMessage,
 } from './protocol'
 import { wsPathFor } from './protocol'
+import { corsHeaders } from './cors'
+import {
+  cleanPlayerId,
+  REDACTED_SEAT_NAME,
+  seatAssignment,
+  seatTokenMatches,
+} from './seat-auth'
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-/** 網上 AI 思考延遲：方便人睇牌河／分析行牌 */
-const AI_DELAY_MS = 1100
 
 interface SeatSlot {
   seat: Seat
@@ -37,6 +46,10 @@ interface SeatSlot {
   kind: SeatKind
   /** Present for human seats (reconnect). */
   token: string | null
+  /** 工作階段玩家。出牌唔睇呢個欄。 */
+  playerId?: string | null
+  /** 未指定時：AI 當進攻；空位由 displayPersonas 預派。 */
+  persona?: AiPersona
 }
 
 interface RoomPersist {
@@ -70,21 +83,12 @@ function emptySeats(): SeatSlot[] {
     name: ['東', '南', '西', '北'][seat]!,
     kind: 'empty' as SeatKind,
     token: null,
+    playerId: null,
   }))
 }
 
 function isSeat(n: unknown): n is Seat {
   return n === 0 || n === 1 || n === 2 || n === 3
-}
-
-function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get('Origin') ?? '*'
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type',
-    'access-control-allow-credentials': 'true',
-  }
 }
 
 function json(data: unknown, init: ResponseInit = {}, request?: Request): Response {
@@ -119,6 +123,9 @@ export class RoomDurableObject {
     }
     if (request.method === 'POST' && path === '/join') {
       return this.handleJoin(request)
+    }
+    if (request.method === 'POST' && path === '/scrub-player') {
+      return this.handleScrub(request)
     }
     if (request.method === 'GET' && path === '/snapshot') {
       await this.load()
@@ -224,6 +231,7 @@ export class RoomDurableObject {
     const body = (await request.json().catch(() => ({}))) as {
       name?: string
       code?: string
+      playerId?: unknown
     }
     const code = (body.code ?? '').toUpperCase()
     if (!code || code.length !== 6) {
@@ -236,9 +244,21 @@ export class RoomDurableObject {
     }
 
     const token = randomToken()
-    const name = sanitizeName(body.name) || '東'
+    const assigned = seatAssignment({
+      reconnect: false,
+      existingPlayerId: null,
+      sessionPlayerId: cleanPlayerId(body.playerId),
+      existingName: '東',
+      requestedName: sanitizeName(body.name),
+    })
     const seats = emptySeats()
-    seats[0] = { seat: 0, name, kind: 'human', token }
+    seats[0] = {
+      seat: 0,
+      name: assigned.name,
+      kind: 'human',
+      token,
+      playerId: assigned.playerId,
+    }
 
     this.room = {
       code,
@@ -274,9 +294,10 @@ export class RoomDurableObject {
       name?: string
       seat?: number
       seatToken?: string
+      playerId?: unknown
     }
 
-    // Reconnect
+    // Reconnect — 座位令牌只證明呢一席。唔改顯示名、唔改 playerId。
     if (body.seatToken) {
       const slot = this.room.seats.find((s) => s.token === body.seatToken)
       if (!slot || slot.kind !== 'human') {
@@ -286,7 +307,15 @@ export class RoomDurableObject {
           request,
         )
       }
-      if (body.name) slot.name = sanitizeName(body.name) || slot.name
+      const assigned = seatAssignment({
+        reconnect: true,
+        existingPlayerId: slot.playerId ?? null,
+        sessionPlayerId: cleanPlayerId(body.playerId),
+        existingName: slot.name,
+        requestedName: sanitizeName(body.name),
+      })
+      slot.name = assigned.name
+      slot.playerId = assigned.playerId
       await this.save()
       return json(
         {
@@ -321,8 +350,20 @@ export class RoomDurableObject {
 
     const token = randomToken()
     const defaults = ['東', '南', '西', '北']
-    const name = sanitizeName(body.name) || defaults[seat]!
-    this.room.seats[seat] = { seat, name, kind: 'human', token }
+    const assigned = seatAssignment({
+      reconnect: false,
+      existingPlayerId: null,
+      sessionPlayerId: cleanPlayerId(body.playerId),
+      existingName: defaults[seat]!,
+      requestedName: sanitizeName(body.name),
+    })
+    this.room.seats[seat] = {
+      seat,
+      name: assigned.name,
+      kind: 'human',
+      token,
+      playerId: assigned.playerId,
+    }
     await this.save()
     this.broadcastRoom()
 
@@ -336,6 +377,29 @@ export class RoomDurableObject {
       {},
       request,
     )
+  }
+
+  private async handleScrub(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => ({}))) as { playerId?: unknown }
+    const playerId = cleanPlayerId(body.playerId)
+    if (!playerId) {
+      return json({ error: 'bad player' }, { status: 400 }, request)
+    }
+    await this.load()
+    if (!this.room) return json({ ok: true, scrubbed: 0 }, {}, request)
+    let scrubbed = 0
+    for (const slot of this.room.seats) {
+      if (slot.playerId === playerId) {
+        slot.name = REDACTED_SEAT_NAME
+        scrubbed += 1
+      }
+    }
+    if (scrubbed > 0) {
+      await this.save()
+      this.broadcastRoom()
+      if (this.room.game) this.broadcastGame()
+    }
+    return json({ ok: true, scrubbed }, {}, request)
   }
 
   private async handleWebSocket(request: Request, url: URL): Promise<Response> {
@@ -354,7 +418,7 @@ export class RoomDurableObject {
       return json({ error: 'invalid seat' }, { status: 400 }, request)
     }
     const slot = this.room.seats[seatNum]!
-    if (slot.kind !== 'human' || !slot.token || slot.token !== token) {
+    if (slot.kind !== 'human' || !seatTokenMatches(slot.token, token)) {
       return json({ error: 'unauthorized' }, { status: 403 }, request)
     }
 
@@ -439,8 +503,10 @@ export class RoomDurableObject {
           this.send(ws, { type: 'error', message: 'kind 無效', code: 'bad_kind' })
           return
         }
+        if (msg.kind === 'ai') this.assignAiPersona(target)
         target.kind = msg.kind
         target.token = null
+        target.playerId = null
         if (msg.kind === 'ai') {
           target.name = target.name || `AI${msg.seat}`
         }
@@ -460,8 +526,10 @@ export class RoomDurableObject {
         }
         for (const s of this.room.seats) {
           if (s.kind === 'empty') {
+            this.assignAiPersona(s)
             s.kind = 'ai'
             s.token = null
+            s.playerId = null
             s.name = s.name.startsWith('AI') ? s.name : `AI${s.seat}`
           }
         }
@@ -493,6 +561,54 @@ export class RoomDurableObject {
         return
       }
 
+      case 'setAiPersona': {
+        if (seat !== this.room.hostSeat) {
+          this.send(ws, {
+            type: 'error',
+            message: '只有房主可以改性格',
+            code: 'not_host',
+          })
+          return
+        }
+        if (this.room.game) {
+          this.send(ws, {
+            type: 'error',
+            message: '牌局進行中',
+            code: 'started',
+          })
+          return
+        }
+        if (!isSeat(msg.seat) || msg.seat === this.room.hostSeat) {
+          this.send(ws, {
+            type: 'error',
+            message: '唔可以改呢個座位',
+            code: 'bad_seat',
+          })
+          return
+        }
+        if (!isAiPersona(msg.persona)) {
+          this.send(ws, {
+            type: 'error',
+            message: '性格無效',
+            code: 'bad_persona',
+          })
+          return
+        }
+        const target = this.room.seats[msg.seat]!
+        if (target.kind === 'human') {
+          this.send(ws, {
+            type: 'error',
+            message: '座位已有真人',
+            code: 'occupied',
+          })
+          return
+        }
+        target.persona = msg.persona
+        await this.save()
+        this.broadcastRoom()
+        return
+      }
+
       case 'start': {
         if (seat !== this.room.hostSeat) {
           this.send(ws, {
@@ -514,8 +630,10 @@ export class RoomDurableObject {
         if (fillAi) {
           for (const s of this.room.seats) {
             if (s.kind === 'empty') {
+              this.assignAiPersona(s)
               s.kind = 'ai'
               s.token = null
+              s.playerId = null
               s.name = `AI${s.seat}`
             }
           }
@@ -537,7 +655,7 @@ export class RoomDurableObject {
           rules: this.room.rules,
           playerNames: names,
         })
-        game = afterEngineStep(game)
+        game = autoPassImpossibleClaims(game)
         this.room.game = game
         this.noteTimers(game, true)
         await this.save()
@@ -567,19 +685,22 @@ export class RoomDurableObject {
     seat: Seat,
     action: Action,
   ): Promise<void> {
-    if (!this.room?.game) {
-      this.send(ws, { type: 'error', message: '未開始', code: 'not_started' })
-      return
-    }
-    if (this.room.seats[seat]!.kind !== 'human') {
-      this.send(ws, { type: 'error', message: '唔係你嘅座位', code: 'not_human' })
+    const room = this.room
+    const game = room?.game ?? null
+    const rejected = rejectHumanAction(
+      game != null,
+      room?.seats[seat]?.kind ?? 'empty',
+    )
+    if (rejected || !room || !game) {
+      if (rejected) {
+        this.send(ws, { type: 'error', message: rejected.message, code: rejected.code })
+      }
       return
     }
 
     try {
-      let next = applyAction(this.room.game, action, seat)
-      next = afterEngineStep(next)
-      this.room.game = next
+      const next = afterPlayerAction(game, action, seat)
+      room.game = next
       this.noteTimers(next, true)
       await this.save()
       this.broadcastGame()
@@ -639,8 +760,7 @@ export class RoomDurableObject {
       if (s.phase !== 'claim_window') break
       if (!s.pendingDiscard?.awaiting.includes(seat)) continue
       try {
-        s = applyAction(s, { type: 'pass' }, seat)
-        s = afterEngineStep(s)
+        s = afterPlayerAction(s, { type: 'pass', reason: 'timeout' }, seat)
       } catch {
         /* ignore */
       }
@@ -667,8 +787,7 @@ export class RoomDurableObject {
       return
     }
     try {
-      s = applyAction(s, choice, seat)
-      s = afterEngineStep(s)
+      s = afterPlayerAction(s, choice, seat)
     } catch {
       this.noteTimers(this.room.game, true)
       await this.save()
@@ -692,21 +811,20 @@ export class RoomDurableObject {
     let s = this.room.game
     let acted = false
 
-    // Claim window: AI seats still awaiting
+    // Claim window: AI only after every human still awaiting has answered.
+    // Claim timeout is handled in alarm() before this tick.
     if (s.phase === 'claim_window' && s.pendingDiscard) {
-      for (const seat of [...s.pendingDiscard.awaiting]) {
-        if (this.room.seats[seat]!.kind !== 'ai') continue
-        const choice = chooseAiAction(s, seat)
+      const kindOf = (seat: Seat) => this.room!.seats[seat]!.kind
+      for (const seat of aiClaimSeats(s.pendingDiscard.awaiting, kindOf)) {
+        const choice = chooseAiAction(s, seat, this.personaOf(seat))
         if (!choice) continue
         try {
-          s = applyAction(s, choice, seat)
-          s = afterEngineStep(s)
+          s = afterPlayerAction(s, choice, seat)
           acted = true
           break
         } catch {
           try {
-            s = applyAction(s, { type: 'pass' }, seat)
-            s = afterEngineStep(s)
+            s = afterPlayerAction(s, { type: 'pass' }, seat)
             acted = true
             break
           } catch {
@@ -720,11 +838,10 @@ export class RoomDurableObject {
     if (!acted && s.phase === 'playing') {
       const seat = s.currentSeat
       if (this.room.seats[seat]!.kind === 'ai') {
-        const choice = chooseAiAction(s, seat)
+        const choice = chooseAiAction(s, seat, this.personaOf(seat))
         if (choice) {
           try {
-            s = applyAction(s, choice, seat)
-            s = afterEngineStep(s)
+            s = afterPlayerAction(s, choice, seat)
             acted = true
           } catch {
             /* AI stub may pick illegal — skip */
@@ -759,13 +876,15 @@ export class RoomDurableObject {
       this.room.claimOpenedAt = opened
       await this.save()
       const deadline = deadlineFromOpened(opened, game.rules.claimTimeoutSec)
-      const aiWaiting = game.pendingDiscard?.awaiting.some(
-        (seat) => this.room!.seats[seat]!.kind === 'ai',
-      )
-      if (aiWaiting) {
-        await this.ctx.storage.setAlarm(Math.min(now + AI_DELAY_MS, deadline))
+      const awaiting = game.pendingDiscard?.awaiting ?? []
+      const kindOf = (seat: Seat) => this.room!.seats[seat]!.kind
+      const aiSeats = aiClaimSeats(awaiting, kindOf)
+      if (aiSeats.length > 0) {
+        const delay = aiThinkMs(this.personaOf(aiSeats[0]!))
+        await this.ctx.storage.setAlarm(Math.min(now + delay, deadline))
         return
       }
+      // 真人未答，或者冇 AI 可鳴：等到鳴牌時限，唔好提早叫醒 AI
       await this.ctx.storage.setAlarm(deadline)
       return
     }
@@ -779,7 +898,8 @@ export class RoomDurableObject {
       }
       const deadline = deadlineFromOpened(opened, game.rules.turnTimeoutSec)
       if (this.room.seats[game.currentSeat]!.kind === 'ai') {
-        await this.ctx.storage.setAlarm(Math.min(now + AI_DELAY_MS, deadline))
+        const delay = aiThinkMs(this.personaOf(game.currentSeat))
+        await this.ctx.storage.setAlarm(Math.min(now + delay, deadline))
         return
       }
       await this.ctx.storage.setAlarm(deadline)
@@ -793,16 +913,28 @@ export class RoomDurableObject {
 
   private snapshot(): RoomSnapshot {
     const room = this.room!
+    const personas = displayPersonas(room.seats)
     return {
       code: room.code,
       hostSeat: room.hostSeat,
       started: room.game != null,
       rules: room.rules,
-      seats: room.seats.map((s) => this.seatInfo(s)),
+      seats: room.seats.map((s) => this.seatInfo(s, personas[s.seat]!)),
     }
   }
 
-  private seatInfo(slot: SeatSlot): SeatInfo {
+  private personaOf(seat: Seat): AiPersona {
+    const persona = this.room?.seats[seat]?.persona
+    return isAiPersona(persona) ? persona : 'attack'
+  }
+
+  /** 座位仍然係 empty 時先叫，預派先同大廳一致。 */
+  private assignAiPersona(slot: SeatSlot): void {
+    if (!this.room || isAiPersona(slot.persona)) return
+    slot.persona = displayPersonas(this.room.seats)[slot.seat]
+  }
+
+  private seatInfo(slot: SeatSlot, persona: AiPersona): SeatInfo {
     const connected =
       slot.kind === 'human' &&
       this.ctx.getWebSockets(`seat:${slot.seat}`).length > 0
@@ -811,6 +943,7 @@ export class RoomDurableObject {
       name: slot.name,
       kind: slot.kind,
       connected: slot.kind === 'ai' ? true : connected,
+      persona,
     }
   }
 
@@ -899,6 +1032,9 @@ export class RoomDurableObject {
       if (!this.room.rules.turnTimeoutSec) {
         this.room.rules = { ...DEFAULT_RULES, ...this.room.rules }
       }
+      for (const slot of this.room.seats) {
+        if (!isAiPersona(slot.persona)) slot.persona = undefined
+      }
     }
   }
 
@@ -906,11 +1042,6 @@ export class RoomDurableObject {
     if (!this.room) return
     await this.ctx.storage.put('room', this.room)
   }
-}
-
-/** 上／碰後係 mustDiscard（唔好自動摸）；只自動 pass 無法鳴牌者 */
-function afterEngineStep(state: GameState): GameState {
-  return autoPassImpossibleClaims(state)
 }
 
 function sanitizeName(name: unknown): string {
